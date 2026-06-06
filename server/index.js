@@ -5,6 +5,7 @@ import http from 'http'
 import mongoose from "mongoose"
 import dotenv from "dotenv"
 import documentRoutes from "./routes/documentRoutes.js"
+import userRoutes from "./routes/userRoutes.js"
 
 dotenv.config()
 const app = express()
@@ -15,6 +16,7 @@ app.use(express.json())
 
 // Routes
 app.use('/api/v1/documents', documentRoutes);
+app.use('/api/v1/user', userRoutes);
 
 
 // Database Connection
