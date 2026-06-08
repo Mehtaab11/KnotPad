@@ -88,6 +88,7 @@ export const updateDocument = async (req, res) => {
     }
 }
 
+
 export const deleteDocument = async (req, res) => {
 
     try {
