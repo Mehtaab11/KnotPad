@@ -24,10 +24,13 @@ export const getDocument = async (req, res) => {
     const id = req.params.id
     const userId = req.userId
     // console.log(id, "test")
-
     try {
-
-        const document = await Document.findById({ _id: id, owner: userId })
+        // this check make sure that you can access the document even if u are a collaborator
+        // or an owner
+        const accessFilter = {
+            $or: [{ owner: userId }, { collaborators: userId }]
+        }
+        const document = await Document.findOne({ _id: id, ...accessFilter })
 
         if (!document) return res.status(404).json({ message: 'Document Not found' })
 
@@ -37,24 +40,26 @@ export const getDocument = async (req, res) => {
     }
 }
 
-
-
 export const getAllDocument = async (req, res) => {
     const userId = req.userId
 
     try {
-        const documents = await Document.find({
-            owner: userId
-        }).sort({
+
+        // this check make sure that you can access the document even if u are a collaborator
+        // or an owner
+        const accessFilter = {
+            $or: [{ owner: userId }, { collaborators: userId }]
+        }
+
+        const documents = await Document.find(accessFilter).sort({
             updatedAt: -1
         })
+
         res.status(200).json(documents)
     } catch (error) {
         res.status(500).json({
             message: "Failed to get Document",
-
             error: error.message
-
         })
     }
 }
@@ -146,7 +151,7 @@ export const addCollaborator = async (req, res) => {
 
         // console.log(guest._id, "guest")
 
-        if (document.collaborators?.includes(guest._id)) {
+        if (document.collaborators?.some((id) => id.equals(guest._id))) {
             return res.status(403).json({ message: 'User has already been added to' });
         }
 
