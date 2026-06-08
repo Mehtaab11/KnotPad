@@ -10,6 +10,16 @@ const DocumentSchema = new Schema({
         type: Object,
         default: '',
     },
+    owner: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    collaborators: [{
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    }]
 }, {
     timestamps: true,
 })

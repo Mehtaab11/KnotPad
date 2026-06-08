@@ -1,28 +1,33 @@
 import Document from "../models/document.js";
+import User from "../models/user.js";
 
 export const createDocument = async (req, res) => {
 
     const { title } = req.body
+    const userId = req.userId
 
     try {
         const document = await Document.create({
-            title: req.body.title
+            owner: userId,
+            title
         })
         res.status(201).json(document)
     } catch (error) {
         res.status(500).json({
             message: "Failed to create Document",
-            error: error.msg
+            error: error.message
         })
     }
 }
 
 export const getDocument = async (req, res) => {
     const id = req.params.id
-    console.log(id, "test")
+    const userId = req.userId
+    // console.log(id, "test")
+
     try {
 
-        const document = await Document.findById(id)
+        const document = await Document.findById({ _id: id, owner: userId })
 
         if (!document) return res.status(404).json({ message: 'Document Not found' })
 
@@ -35,24 +40,35 @@ export const getDocument = async (req, res) => {
 
 
 export const getAllDocument = async (req, res) => {
+    const userId = req.userId
+
     try {
-        const documents = await Document.find().sort({
+        const documents = await Document.find({
+            owner: userId
+        }).sort({
             updatedAt: -1
         })
         res.status(200).json(documents)
     } catch (error) {
         res.status(500).json({
             message: "Failed to get Document",
-            error: error.msg
+
+            error: error.message
+
         })
     }
 }
 
 export const updateDocument = async (req, res) => {
+    const userId = req.userId
+
     try {
         const { title, content } = req.body
 
-        const document = await Document.findByIdAndUpdate(req.params.id, {
+        const document = await Document.findByIdAndUpdate({
+            _id: req.params.id,
+            owner: userId
+        }, {
             title, content
         },
             { new: true } // this line makes sure the updated document is also returned not only updated
@@ -65,7 +81,9 @@ export const updateDocument = async (req, res) => {
 
         res.status(500).json({
             message: "Failed to update Document",
-            error: error.msg
+
+            error: error.message
+
         })
     }
 }
@@ -74,19 +92,74 @@ export const deleteDocument = async (req, res) => {
 
     try {
 
-        const document = await Document.findByIdAndDelete(req.params.id)
+        const document = await Document.findByIdAndDelete({ _id: req.params.id, owner: req.userId })
 
         if (!document) return res.status(404).json({ message: 'Document Not found' })
 
         return res.status(200).json({ message: "Document Deleted Successfully" })
 
-
     } catch (error) {
 
         res.status(500).json({
             message: "Failed to update Document",
-            error: error.msg
+            error: error.message
         })
     }
 
+}
+
+export const addCollaborator = async (req, res) => {
+    try {
+        const userId = req.userId
+        const { email } = req.body
+        const docId = req.params.id
+
+        console.log(docId, "test")
+        // const document = Document.findById({ _id: docId })
+
+        const document = await Document.findById({ _id: docId })
+
+        // console.log(document, "test")
+
+        if (!document) return res.status(404).json({ message: 'Document Not found' })
+
+        if (document.owner.toString() !== userId) {
+            return res.status(403).json({ message: 'Only the owner can add collaborators' });
+        }
+
+        // console.log(document.owner.toString(), "testtttt")
+
+        const guest = await User.findOne({
+            email: email.toLowerCase()
+        })
+
+        if (!guest) {
+            return res.status(403).json({ message: 'This user doesnt exists' });
+        }
+
+        // console.log(guest._id.toString())
+        // console.log(document)
+        if (guest._id.toString() === document.owner.toString()) {
+            return res.status(403).json({ message: 'Owner itself can\'t be added in the collaborators list' });
+        }
+
+        // console.log(guest._id, "guest")
+
+        if (document.collaborators?.includes(guest._id)) {
+            return res.status(403).json({ message: 'User has already been added to' });
+        }
+
+        const updatedDocument = await Document.findByIdAndUpdate({ _id: docId }, { $addToSet: { collaborators: guest._id } }, {
+            new: true
+        })
+
+
+        res.status(200).json({ message: 'Collaborator added successfully', updatedDocument });
+    } catch (error) {
+
+        res.status(500).json({
+            message: "Failed to add collaborators",
+            error: error.message
+        })
+    }
 }

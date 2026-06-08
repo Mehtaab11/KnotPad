@@ -72,3 +72,4 @@ export const profile = async (req, res) => {
         res.status(500).json({ message: error.message })
     }
 }
+
