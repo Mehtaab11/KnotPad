@@ -4,6 +4,7 @@ import { Server } from "socket.io"
 import http from 'http'
 import mongoose from "mongoose"
 import dotenv from "dotenv"
+import jwt from "jsonwebtoken"
 import documentRoutes from "./routes/documentRoutes.js"
 import userRoutes from "./routes/userRoutes.js"
 import Document from "./models/document.js"
@@ -31,7 +32,7 @@ const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: ' http://localhost:3000',
+        origin: 'http://localhost:3000',
         methods: ['GET', 'POST']
     }
 })
@@ -76,20 +77,18 @@ io.on("connection", (socket) => {
 
             socket.emit("load-document", document)
 
-
-            socket.on("send-changes", (data) => {
-                socket.broadcast.to(documentId).emit("receive-changes", data)
+            socket.on("send-changes", (delta) => {
+                socket.broadcast.to(documentId).emit("receive-changes", delta)
             })
 
-            socket.on("save-changes", async (data) => {
+            socket.on("save-changes", async (delta) => {
                 await Document.findByIdAndUpdate(documentId, {
-                    content: data
+                    content: delta
                 })
             })
 
         } catch (error) {
-
-            return next(new Error('Error: server Error while loading the document'));
+            return socket.emit('Error', 'Error: server Error while loading the document');
         }
     })
 
