@@ -5,11 +5,14 @@ import jwt from 'jsonwebtoken'
 export const authMiddleware = async (req, res, next) => {
     try {
 
-        const token = req.headers.authorization
+        const authHeader = req.headers.authorization
 
-        if (!token) {
+        if (!authHeader) {
             return res.status(401).json({ message: "No Token" })
         }
+
+        // Extract token from "Bearer {token}" format
+        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
