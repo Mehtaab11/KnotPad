@@ -71,13 +71,7 @@ function App() {
 
         <Route
           path="/document/:id"
-          element={
-            isAuthenticated ? (
-              <Editor />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
+          element={isAuthenticated ? <Editor /> : <Navigate to="/login" />}
         />
 
         <Route
@@ -91,7 +85,7 @@ function App() {
             <Navigate to={isAuthenticated ? "/dashboard" : "/register"} />
           }
         ></Route>
-      </Routes>{" "}
+      </Routes>
     </Router>
   );
 }
