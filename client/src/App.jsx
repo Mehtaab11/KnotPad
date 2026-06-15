@@ -75,11 +75,6 @@ function App() {
         />
 
         <Route
-          path="/document/:id"
-          element={isAuthenticated ? <Editor /> : <Navigate to="/login" />}
-        />
-
-        <Route
           path="*"
           element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />}
         ></Route>

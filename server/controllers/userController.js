@@ -3,7 +3,6 @@ import User from "../models/user.js";
 import bcrypt from "bcryptjs"
 
 export const register = async (req, res) => {
-    console.log("conterol")
 
     try {
         const { name, email, password } = req.body

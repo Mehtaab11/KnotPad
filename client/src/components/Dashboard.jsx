@@ -135,10 +135,17 @@ const Dashboard = ({ setAuth }) => {
     },
   ];
 
-  const recentDocs = [...documents]
-    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-    .slice(0, 4);
-  const displayDocs = activeNav === "recent" ? recentDocs : documents;
+  const sortedDocs = [...documents].sort(
+    (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+  );
+
+  const recentDocs = sortedDocs.slice(0, 4); // preview strip only
+  const displayDocs =
+    activeNav === "recent"
+      ? sortedDocs
+      : activeNav === "starred"
+        ? documents.filter((d) => d.isStarred) // replace with actual starred field
+        : documents;
 
   return (
     <div
@@ -434,6 +441,8 @@ const Dashboard = ({ setAuth }) => {
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
+           
+
             <button
               onClick={handleCreateDocument}
               className="lg:hidden flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white"
