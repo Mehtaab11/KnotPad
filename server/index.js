@@ -5,11 +5,14 @@ import http from 'http'
 import mongoose from "mongoose"
 import dotenv from "dotenv"
 import jwt from "jsonwebtoken"
+// Routes and Models
 import documentRoutes from "./routes/documentRoutes.js"
 import userRoutes from "./routes/userRoutes.js"
 import Document from "./models/document.js"
 
 dotenv.config()
+
+// app initialisation
 const app = express()
 
 
@@ -32,10 +35,10 @@ const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: 'http://localhost:3000',
-        methods: ['GET', 'POST']
-    }
-})
+        origin: ['http://localhost:3000', 'http://localhost:5173'], // Added your Vite port!
+        methods: ['GET', 'POST'],
+    },
+});
 
 io.use((socket, next) => {
     const token = socket.handshake.auth.token
@@ -56,6 +59,11 @@ io.on("connection", (socket) => {
     console.log(`User connected via socket: ${socket.userId}`)
 
     socket.on("get-document", async (documentId) => {
+
+        if (!mongoose.isValidObjectId(documentId)) {
+            return socket.emit("error", "Invalid document id")
+        }
+
         try {
             const document = await Document.findById(documentId)
 
@@ -75,7 +83,7 @@ io.on("connection", (socket) => {
 
             socket.join(documentId)
 
-            socket.emit("load-document", document)
+            socket.emit("load-document", document.content)
 
             socket.on("send-changes", (delta) => {
                 socket.broadcast.to(documentId).emit("receive-changes", delta)
@@ -96,8 +104,6 @@ io.on("connection", (socket) => {
         console.log(`User disconnected: ${socket.userId || socket.user.id}`);
     })
 })
-
-
 
 // Running the app
 const PORT = process.env.PORT || 5000;
