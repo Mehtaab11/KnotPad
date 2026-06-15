@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+@import "tailwindcss";
+
+.ql-toolbar.ql-snow {
+  border: none !important;
+  border-bottom: 1px solid #eaeaea !important;
+  display: flex;
+  justify-content: center;
+  background-color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.ql-container.ql-snow {
+  border: none !important;
+  font-family: 'Inter', sans-serif;
+  font-size: 1.1rem;
+  flex: 1; 
+}
+
+.ql-editor {
+  padding: 1in; 
+}

@@ -1,13 +1,35 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchAPI } from "../utils/api.js";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 
 const Login = ({ setAuth }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+
+  const inputStyle = {
+    background: "#fff5f6",
+    border: "1.5px solid #f0d0d4",
+    color: "#2a0a0f",
+  };
+
+  const handleFocus = (e) => {
+    e.target.style.border = "1.5px solid #c41230";
+    e.target.style.boxShadow = "0 0 0 3px rgba(196,18,48,0.10)";
+  };
+
+  const handleBlur = (e) => {
+    e.target.style.border = "1.5px solid #f0d0d4";
+    e.target.style.boxShadow = "none";
+  };
+
+  const passwordToggle = (e) => {
+    setShowPassword((prev) => !prev);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -27,6 +49,10 @@ const Login = ({ setAuth }) => {
       setIsLoading(false);
     }
   };
+
+  // const passwordToggle = (e) => {
+  //   setShowPassword((prev) => !prev);
+  // };
 
   return (
     <div
@@ -341,6 +367,45 @@ const Login = ({ setAuth }) => {
               >
                 Password
               </label>
+
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  disabled={isLoading}
+                  className="w-full rounded-xl px-4 py-3 pr-12 text-sm outline-none transition-all duration-150 disabled:opacity-50"
+                  style={inputStyle}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                />
+
+                <button
+                  type="button"
+                  onClick={passwordToggle}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? (
+                    <AiOutlineEyeInvisible size={20} />
+                  ) : (
+                    <AiOutlineEye size={20} />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* <div>
+              <label
+                htmlFor="password"
+                className="block text-[13px] font-semibold mb-1.5"
+                style={{ color: "#5a1520" }}
+              >
+                Password
+              </label>
               <input
                 id="password"
                 type="password"
@@ -365,7 +430,7 @@ const Login = ({ setAuth }) => {
                   e.target.style.boxShadow = "none";
                 }}
               />
-            </div>
+            </div> */}
 
             <div className="pt-1">
               <button
@@ -438,6 +503,15 @@ const Login = ({ setAuth }) => {
               </button>
             </div>
           </form>
+
+          <p className="text-[13px] mt-6" style={{ color: "#a87493 " }}>
+            Do not have an account?{" "}
+            <Link to="/register">
+              <span className="hover:underline text-red-800">
+                Register
+              </span>{" "}
+            </Link>
+          </p>
 
           {/* Footer */}
           <p

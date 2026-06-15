@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchAPI } from "../utils/api.js";
 
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
+
 const Register = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -10,6 +12,7 @@ const Register = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -42,6 +45,10 @@ const Register = () => {
   const handleBlur = (e) => {
     e.target.style.border = "1.5px solid #f0d0d4";
     e.target.style.boxShadow = "none";
+  };
+
+  const passwordToggle = (e) => {
+    setShowPassword((prev) => !prev);
   };
 
   return (
@@ -359,7 +366,47 @@ const Register = () => {
             </div>
 
             {/* Password */}
+
             <div>
+              <label
+                htmlFor="password"
+                className="block text-[13px] font-semibold mb-1.5"
+                style={{ color: "#5a1520" }}
+              >
+                Password
+              </label>
+
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  disabled={isLoading}
+                  className="w-full rounded-xl px-4 py-3 pr-12 text-sm outline-none transition-all duration-150 disabled:opacity-50"
+                  style={inputStyle}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                />
+
+                <button
+                  type="button"
+                  onClick={passwordToggle}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? (
+                    <AiOutlineEyeInvisible size={20} />
+                  ) : (
+                    <AiOutlineEye size={20} />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* <div>
               <label
                 htmlFor="password"
                 className="block text-[13px] font-semibold mb-1.5"
@@ -369,7 +416,7 @@ const Register = () => {
               </label>
               <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -381,8 +428,14 @@ const Register = () => {
                 onFocus={handleFocus}
                 onBlur={handleBlur}
               />
-            </div>
-
+              <div onClick={passwordToggle}>
+                {showPassword ? (
+                  <AiOutlineEyeInvisible size={20} />
+                ) : (
+                  <AiOutlineEye size={20} />
+                )}
+              </div>
+            </div> */}
             {/* Submit */}
             <div className="pt-1">
               <button

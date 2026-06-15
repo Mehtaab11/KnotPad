@@ -35,10 +35,10 @@ const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: 'http://localhost:3000',
-        methods: ['GET', 'POST']
-    }
-})
+        origin: ['http://localhost:3000', 'http://localhost:5173'], // Added your Vite port!
+        methods: ['GET', 'POST'],
+    },
+});
 
 io.use((socket, next) => {
     const token = socket.handshake.auth.token
@@ -83,7 +83,7 @@ io.on("connection", (socket) => {
 
             socket.join(documentId)
 
-            socket.emit("load-document", document)
+            socket.emit("load-document", document.content)
 
             socket.on("send-changes", (delta) => {
                 socket.broadcast.to(documentId).emit("receive-changes", delta)
