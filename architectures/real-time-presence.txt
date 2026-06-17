@@ -1,0 +1,39 @@
+ ┌──────────────────────┐                           ┌────────────────────────────┐
+ │  REACT FRONTEND      │                           │  NODE.JS / SOCKET SERVER   │
+ │                      │                           │                            │
+ │  State: activeUsers  │                           │  Memory: activeRooms = {}  │
+ └───────┬──────────────┘                           └─────────────┬──────────────┘
+         │                                                        │
+         │ 1. JOIN: Emit 'get-document' (ID: 123)                 │
+         ├───────────────────────────────────────────────────────►│
+         │                                                        │ 2. CHECK DB
+         │                                                        ├─────────► Fetch User Name
+         │                                                        │           from MongoDB
+         │                                                        │
+         │                                                        │ 3. UPDATE MEMORY
+         │                                                        │ activeRooms['123'].push({
+         │                                                        │   userId, name, socketId
+         │                                                        │ })
+         │                                                        │
+         │ 4. BROADCAST: Emit 'presence-update' (Array of Users)  │
+         │◄───────────────────────────────────────────────────────┤
+         │                                                        │
+         │ (User closes their browser tab)                        │
+         │                                                        │
+         │ 5. LEAVE: Socket automatically fires 'disconnect'      │
+         ├─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─►│
+         │                                                        │ 6. CLEANUP MEMORY
+         │                                                        │ activeRooms['123'].filter(
+         │                                                        │   remove disconnected socketId
+         │                                                        │ )
+         │                                                        │
+         │ 7. BROADCAST: Emit 'presence-update' (Updated Array)   │
+         │◄───────────────────────────────────────────────────────┤
+ ┌───────┴──────────────┐                           ┌─────────────┴──────────────┐
+ │ React triggers       │                           │ Server awaits next event   │
+ │ re-render, removing  │                           │                            │
+ │ the user's avatar.   │                           │                            │
+ └──────────────────────┘                           └────────────────────────────┘
+
+ 
+After the step 4 the user avatar will be updated on the Frontend
