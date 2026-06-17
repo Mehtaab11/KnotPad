@@ -16,10 +16,7 @@ const Dashboard = ({ setAuth }) => {
       setDocuments(data);
     } catch (err) {
       setError("Failed to load documents.");
-      if (
-        err.message.includes("Authentication") ||
-        err.message.includes("token")
-      ) {
+      if (err.message.includes("jwt") || err.message.includes("expired")) {
         handleLogout();
       }
     }
@@ -34,6 +31,9 @@ const Dashboard = ({ setAuth }) => {
       navigate(`/document/${newDoc._id}`);
     } catch (err) {
       setError(err.message);
+      if (err.message.includes("jwt") || err.message.includes("expired")) {
+        handleLogout();
+      }
     }
   };
 
@@ -69,6 +69,7 @@ const Dashboard = ({ setAuth }) => {
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays} days ago`;
+
     return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -441,8 +442,6 @@ const Dashboard = ({ setAuth }) => {
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-           
-
             <button
               onClick={handleCreateDocument}
               className="lg:hidden flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white"
@@ -909,3 +908,5 @@ const Dashboard = ({ setAuth }) => {
 };
 
 export default Dashboard;
+
+// maximum number of lines are being used by the svgs and animations, so I won't be able to shorten those without losing the icons. The rest of the code is already quite concise and well-structured, following best practices for React components. If you have specific areas you'd like me to focus on for optimization or refactoring, please let me know! ~ Mehtaab

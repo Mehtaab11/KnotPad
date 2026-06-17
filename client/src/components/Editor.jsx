@@ -39,6 +39,7 @@ const Editor = () => {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteMsg, setInviteMsg] = useState({ type: "", text: "" });
   const [wordCount, setWordCount] = useState(0);
+  const [activeUsers, setActiveUsers] = useState([]);
 
   // ── 1. Quill init via callback ref ───────────────────────────────────────
   // Called once when the wrapper div mounts. We never re-run this.
@@ -62,6 +63,7 @@ const Editor = () => {
   }, []);
 
   // ── 2. Fetch document title ──────────────────────────────────────────────
+  // Understood
   useEffect(() => {
     const load = async () => {
       try {
@@ -92,6 +94,9 @@ const Editor = () => {
     s.on("connect_error", (err) =>
       console.error("❌ Socket error:", err.message),
     );
+    s.on("presence-updates", (users) => {
+      setActiveUsers(users);
+    });
     s.on("error", (msg) => {
       alert(msg);
       navigate("/dashboard");
@@ -228,6 +233,27 @@ const Editor = () => {
     error: { label: "Save failed", dot: "#c41230" },
   };
   const st = statusMap[saveStatus] ?? statusMap.saved;
+
+  // Extracts initials (e.g., "John Doe" -> "JD")
+  const getInitials = (name) => {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  // Generates a consistent background color based on the username string
+  const getAvatarColor = (name) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 40%)`; // Dark, readable colors that fit the minimal theme
+  };
 
   return (
     <>
@@ -475,6 +501,30 @@ const Editor = () => {
               {wordCount} {wordCount === 1 ? "word" : "words"}
             </span>
 
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              {activeUsers.map((user) => (
+                <div
+                  key={user.socketId}
+                  title={user.name} // Shows full name on hover
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    backgroundColor: getAvatarColor(user.name),
+                    color: "#fff",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    fontSize: "0.875rem",
+                    fontWeight: "600",
+                    boxShadow: "0 0 0 2px #fff", // Clean white border separation
+                  }}
+                >
+                  {getInitials(user.name)}
+                </div>
+              ))}
+            </div>
+
             <button
               onClick={() => setIsModalOpen(true)}
               style={{
@@ -519,6 +569,8 @@ const Editor = () => {
               </svg>
               Share
             </button>
+
+            {/* Active collaborators */}
           </div>
         </header>
 

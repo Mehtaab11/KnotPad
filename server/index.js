@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken"
 import documentRoutes from "./routes/documentRoutes.js"
 import userRoutes from "./routes/userRoutes.js"
 import Document from "./models/document.js"
+import User from "./models/user.js"
 
 dotenv.config()
 
@@ -33,12 +34,14 @@ mongoose.connect(MONGO_URI)
 // Socket intitialisation
 const server = http.createServer(app)
 
+
 const io = new Server(server, {
     cors: {
         origin: ['http://localhost:3000', 'http://localhost:5173'], // Added your Vite port!
         methods: ['GET', 'POST'],
     },
 });
+const activeRooms = {}
 
 io.use((socket, next) => {
     const token = socket.handshake.auth.token
@@ -56,7 +59,9 @@ io.use((socket, next) => {
 })
 
 io.on("connection", (socket) => {
-    console.log(`User connected via socket: ${socket.userId}`)
+    // Track which room this specific socket connection is
+    let currentDocumentId = null
+    // console.log(`User connected via socket: ${socket.userId}`)
 
     socket.on("get-document", async (documentId) => {
 
@@ -81,7 +86,26 @@ io.on("connection", (socket) => {
                 return socket.emit('error', 'Unauthorized: You do not have access');
             }
 
+            const userRecord = await User.findById(userId)
+
+            const userName = userRecord ? userRecord.name : 'Anonymous'
+
             socket.join(documentId)
+            currentDocumentId = documentId
+
+            if (!activeRooms[documentId]) activeRooms[documentId] = []
+
+
+            const isAlreadyInRoom = activeRooms[documentId].some(u => u.userId == userId.toString())
+            if (!isAlreadyInRoom) {
+                activeRooms[documentId].push({
+                    userId: userId.toString(),
+                    name: userName,
+                    socketId: socket.id
+                })
+            }
+
+            io.to(documentId).emit('presence-updates', activeRooms[documentId])
 
             socket.emit("load-document", document.content)
 
@@ -95,6 +119,10 @@ io.on("connection", (socket) => {
                 })
             })
 
+            socket.on('save-document', async (delta) => {
+                await Document.findByIdAndUpdate(documentId, { content: delta });
+            });
+
         } catch (error) {
             return socket.emit('Error', 'Error: server Error while loading the document');
         }
@@ -102,6 +130,11 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", () => {
         console.log(`User disconnected: ${socket.userId || socket.user.id}`);
+
+        if (currentDocumentId && activeRooms[currentDocumentId]) {
+            activeRooms[currentDocumentId] = activeRooms[currentDocumentId].filter(u => u.socketId != socket.id)
+            io.to(currentDocumentId).emit('presence-updates', activeRooms[currentDocumentId])
+        }
     })
 })
 
