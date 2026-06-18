@@ -194,7 +194,7 @@ const Editor = () => {
     const q = quillRef.current;
     const s = socketRef.current;
     const handler = (range, oldRange, source) => {
-      if (source == "user") {
+      if (source === "user") {
         s.emit("send-cursor", range);
       }
     };
