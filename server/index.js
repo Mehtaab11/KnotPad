@@ -113,6 +113,19 @@ io.on("connection", (socket) => {
                 socket.broadcast.to(documentId).emit("receive-changes", delta)
             })
 
+            //  Handle incoming cursor movements 
+            socket.on('send-cursor', (range) => {
+                // Find the user's name from our activeRooms memory
+                const userInRoom = activeRooms[documentId]?.find(u => u.socketId === socket.id);
+                const userName = userInRoom ? userInRoom.name : 'Anonymous';
+
+                socket.broadcast.to(documentId).emit('receive-cursor', {
+                    userId: userId.toString(),
+                    name: userName,
+                    range: range
+                });
+            }); 
+
             socket.on("save-changes", async (delta) => {
                 await Document.findByIdAndUpdate(documentId, {
                     content: delta

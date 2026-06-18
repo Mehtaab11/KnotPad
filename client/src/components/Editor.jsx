@@ -6,6 +6,11 @@ import "quill/dist/quill.snow.css";
 import { io } from "socket.io-client";
 import { fetchAPI } from "../utils/api";
 
+import QuillCursors from "quill-cursors"; // Import the module
+
+// Register the module with Quill before the component renders
+Quill.register("modules/cursors", QuillCursors);
+
 const SAVE_INTERVAL_MS = 2000;
 const TITLE_DEBOUNCE_MS = 800;
 
@@ -41,6 +46,17 @@ const Editor = () => {
   const [wordCount, setWordCount] = useState(0);
   const [activeUsers, setActiveUsers] = useState([]);
 
+  //  Extracts initials (e.g., "John Doe" -> "JD")
+  // Generates a consistent background color based on the username string
+  const getAvatarColor = (name) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 40%)`; // Dark, readable colors that fit the minimal theme
+  };
+
   // ── 1. Quill init via callback ref ───────────────────────────────────────
   // Called once when the wrapper div mounts. We never re-run this.
   const wrapperRef = useCallback((wrapper) => {
@@ -53,7 +69,7 @@ const Editor = () => {
 
     const q = new Quill(editorDiv, {
       theme: "snow",
-      modules: { toolbar: TOOLBAR_OPTIONS },
+      modules: { toolbar: TOOLBAR_OPTIONS, cursors: true },
       placeholder: "Start writing…",
     });
 
@@ -150,6 +166,11 @@ const Editor = () => {
       setSaveStatus("saving");
       s.emit("send-changes", delta);
       // Update word count
+
+      const currentSelection = q.getSelection();
+      if (currentSelection) {
+        s.emit("send-cursor", currentSelection);
+      }
       setWordCount(q.getText().trim().split(/\s+/).filter(Boolean).length);
     };
 
@@ -167,6 +188,49 @@ const Editor = () => {
     s.on("receive-changes", onReceive);
     return () => s.off("receive-changes", onReceive);
   }, [quillReady, socketReady]);
+
+  useEffect(() => {
+    if (!socketReady || !quillReady) return;
+    const q = quillRef.current;
+    const s = socketRef.current;
+    const handler = (range, oldRange, source) => {
+      if (source == "user") {
+        s.emit("send-cursor", range);
+      }
+    };
+
+    q.on("selection-change", handler);
+
+    return () => q.off("selection-change", handler);
+  }, [socketReady, quillReady]);
+
+  useEffect(() => {
+    if (!socketReady || !quillReady) return;
+    const s = socketRef.current;
+    const q = quillRef.current;
+
+    const cursorsModule = q.getModule("cursors");
+
+    const handler = (data) => {
+      const { userId, name, range } = data;
+
+      // 1. If we haven't seen this cursor yet, create it with their matching avatar color
+      if (!cursorsModule.cursors()[userId]) {
+        cursorsModule.createCursor(userId, name, getAvatarColor(name));
+      }
+
+      // 2. Move the cursor (or hide it if they clicked completely outside the document)
+      if (range) {
+        cursorsModule.moveCursor(userId, range);
+      } else {
+        cursorsModule.removeCursor(userId);
+      }
+    };
+
+    s.on("receive-cursor", handler);
+
+    return () => s.off("receive-cursor", handler);
+  }, [socketReady, quillReady]);
 
   // ── 7. Auto-save loop ────────────────────────────────────────────────────
   useEffect(() => {
@@ -246,14 +310,14 @@ const Editor = () => {
   };
 
   // Generates a consistent background color based on the username string
-  const getAvatarColor = (name) => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = hash % 360;
-    return `hsl(${hue}, 70%, 40%)`; // Dark, readable colors that fit the minimal theme
-  };
+  // const getAvatarColor = (name) => {
+  //   let hash = 0;
+  //   for (let i = 0; i < name.length; i++) {
+  //     hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  //   }
+  //   const hue = hash % 360;
+  //   return `hsl(${hue}, 70%, 40%)`; // Dark, readable colors that fit the minimal theme
+  // };
 
   return (
     <>
