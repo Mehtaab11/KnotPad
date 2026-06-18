@@ -59,3 +59,11 @@ emit("save-changes")
      │
      ▼
 Server saves database
+
+
+
+Feat 
+
+- Download
+- Active Icons
+- live cursors
