@@ -1,14 +1,12 @@
-// client/src/components/Editor.js
+// client/src/components/Editor.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Quill from "quill";
 import "quill/dist/quill.snow.css";
 import { io } from "socket.io-client";
 import { fetchAPI } from "../utils/api";
+import QuillCursors from "quill-cursors";
 
-import QuillCursors from "quill-cursors"; // Import the module
-
-// Register the module with Quill before the component renders
 Quill.register("modules/cursors", QuillCursors);
 
 const SAVE_INTERVAL_MS = 2000;
@@ -23,101 +21,154 @@ const TOOLBAR_OPTIONS = [
   [{ script: "sub" }, { script: "super" }],
   [{ align: [] }],
   ["image", "blockquote", "code-block"],
-  ["clean"],
 ];
+
+/* ─── Design Tokens ───────────────────────────────────────────── */
+const T = {
+  bgBase: "#0F0F0F",
+  bgSurface: "#171717",
+  bgRaised: "#1E1C1C",
+  bgInput: "#1A1A1A",
+  borderDim: "#252525",
+  borderChip: "#2E2E2E",
+  textPrimary: "#EDEDED",
+  textSec: "#888888",
+  textDim: "#444444",
+  accent: "#C8102E",
+  accentHover: "#E01030",
+  accentGlow: "rgba(200,16,46,0.11)",
+  /* Editor paper — slightly warmer than base so it reads as a card */
+  paper: "#141414",
+  paperBorder: "#222222",
+};
+
+/* ─── Cursor palette — vivid, distinct, fun to watch ─────────── */
+const CURSOR_PALETTE = [
+  { bg: "#9B8EC4", label: "Lavender" },
+  { bg: "#5BBFB5", label: "Teal" },
+  { bg: "#E07850", label: "Coral" },
+  { bg: "#C4D480", label: "Lime" },
+  { bg: "#7EB8D4", label: "Sky" },
+  { bg: "#D4A07E", label: "Sand" },
+  { bg: "#E8C547", label: "Yellow" },
+  { bg: "#C47EB8", label: "Mauve" },
+];
+
+const getCursorColor = (name) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return CURSOR_PALETTE[Math.abs(h) % CURSOR_PALETTE.length].bg;
+};
+
+const getInitials = (name) =>
+  name
+    ? name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "?";
+
+/* ─── LogoMark ────────────────────────────────────────────────── */
+const LogoMark = () => (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+  >
+    <rect x="4" y="4" width="6" height="6" rx="1.5" fill="white" />
+    <rect
+      x="14"
+      y="4"
+      width="6"
+      height="6"
+      rx="1.5"
+      fill="white"
+      opacity="0.45"
+    />
+    <rect
+      x="4"
+      y="14"
+      width="6"
+      height="6"
+      rx="1.5"
+      fill="white"
+      opacity="0.45"
+    />
+    <rect x="14" y="14" width="6" height="6" rx="1.5" fill="white" />
+  </svg>
+);
 
 const Editor = () => {
   const { id: documentId } = useParams();
   const navigate = useNavigate();
 
-  // ── Refs (stable across renders, no closure staleness) ──────────────────
-  const quillRef = useRef(null); // the Quill instance
-  const socketRef = useRef(null); // the socket instance
+  const quillRef = useRef(null);
+  const socketRef = useRef(null);
   const titleDebounce = useRef(null);
 
-  // ── State ────────────────────────────────────────────────────────────────
-  const [quillReady, setQuillReady] = useState(false); // signals effects to run
+  const [quillReady, setQuillReady] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
   const [title, setTitle] = useState("");
-  const [saveStatus, setSaveStatus] = useState("saved"); // "saved"|"saving"|"error"
+  const [saveStatus, setSaveStatus] = useState("saved");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteMsg, setInviteMsg] = useState({ type: "", text: "" });
   const [wordCount, setWordCount] = useState(0);
   const [activeUsers, setActiveUsers] = useState([]);
 
-  //  Extracts initials (e.g., "John Doe" -> "JD")
-  // Generates a consistent background color based on the username string
-  const getAvatarColor = (name) => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = hash % 360;
-    return `hsl(${hue}, 70%, 40%)`; // Dark, readable colors that fit the minimal theme
-  };
-
-  // ── 1. Quill init via callback ref ───────────────────────────────────────
-  // Called once when the wrapper div mounts. We never re-run this.
+  /* ── 1. Quill init ─────────────────────────────────────────── */
   const wrapperRef = useCallback((wrapper) => {
-    if (!wrapper || quillRef.current) return; // already initialized
+    if (!wrapper || quillRef.current) return;
     wrapper.innerHTML = "";
-
-    // Quill needs a child div to attach to
     const editorDiv = document.createElement("div");
     wrapper.append(editorDiv);
-
     const q = new Quill(editorDiv, {
       theme: "snow",
-      modules: { toolbar: TOOLBAR_OPTIONS, cursors: true },
+      modules: {
+        toolbar: TOOLBAR_OPTIONS,
+        cursors: {
+          transformOnTextChange: true, // keeps remote cursors glued as text shifts
+        },
+      },
       placeholder: "Start writing…",
     });
-
     q.disable();
     quillRef.current = q;
-    setQuillReady(true); // ← tells effects "quill is live"
+    setQuillReady(true);
   }, []);
 
-  // ── 2. Fetch document title ──────────────────────────────────────────────
-  // Understood
+  /* ── 2. Fetch title ────────────────────────────────────────── */
   useEffect(() => {
     const load = async () => {
       try {
         const doc = await fetchAPI(`/documents/${documentId}`);
         setTitle(doc.title ?? "Untitled Document");
       } catch (e) {
-        console.error("Could not fetch document metadata", e);
+        console.error("title fetch", e);
       }
     };
     load();
   }, [documentId]);
 
-  // ── 3. Socket connection ─────────────────────────────────────────────────
-
-  // This useEffect is uderstandable
+  /* ── 3. Socket ─────────────────────────────────────────────── */
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
       navigate("/login");
       return;
     }
-
     const s = io("http://localhost:5000", { auth: { token } });
-    s.on("connect", () => {
-      console.log("✅ Socket:", s.id);
-      setSocketReady(true);
-    });
-    s.on("connect_error", (err) =>
-      console.error("❌ Socket error:", err.message),
-    );
-    s.on("presence-updates", (users) => {
-      setActiveUsers(users);
-    });
+    s.on("connect", () => setSocketReady(true));
+    s.on("connect_error", (err) => console.error("socket:", err.message));
+    s.on("presence-updates", setActiveUsers);
     s.on("error", (msg) => {
       alert(msg);
       navigate("/dashboard");
     });
-
     socketRef.current = s;
     return () => {
       s.disconnect();
@@ -125,138 +176,100 @@ const Editor = () => {
     };
   }, [navigate]);
 
-  // ── 4. Load document content ─────────────────────────────────────────────
-  // Only runs when BOTH quill and socket are confirmed ready
+  /* ── 4. Load document content ──────────────────────────────── */
   useEffect(() => {
     if (!quillReady || !socketReady) return;
-    const q = quillRef.current;
-    const s = socketRef.current;
+    const q = quillRef.current,
+      s = socketRef.current;
     if (!q || !s) return;
-
     const onLoad = (content) => {
-      console.log("📥 load-document received:", content);
-      // console.log("📥 load-document received:", content.content.ops[0].insert);
-      if (content && content.ops && content.ops.length > 0) {
-        q.setContents(content);
-      } else {
-        q.setContents([{ insert: "\n " }]);
-      }
+      q.setContents(content?.ops?.length ? content : [{ insert: "\n" }]);
       q.enable();
       q.focus();
       setSaveStatus("saved");
-      // Initial word count
       setWordCount(q.getText().trim().split(/\s+/).filter(Boolean).length);
     };
-
-    // Use `once` so it doesn't double-fire on reconnect
     s.once("load-document", onLoad);
     s.emit("get-document", documentId);
-
     return () => s.off("load-document", onLoad);
   }, [quillReady, socketReady, documentId]);
 
-  // ── 5. Send local changes → collaborators ────────────────────────────────
+  /* ── 5. Send changes ───────────────────────────────────────── */
   useEffect(() => {
     if (!quillReady || !socketReady) return;
-    const q = quillRef.current;
-    const s = socketRef.current;
-
+    const q = quillRef.current,
+      s = socketRef.current;
     const onTextChange = (delta, _old, source) => {
       if (source !== "user") return;
       setSaveStatus("saving");
       s.emit("send-changes", delta);
-      // Update word count
-
-      const currentSelection = q.getSelection();
-      if (currentSelection) {
-        s.emit("send-cursor", currentSelection);
-      }
+      const sel = q.getSelection();
+      if (sel) s.emit("send-cursor", sel);
       setWordCount(q.getText().trim().split(/\s+/).filter(Boolean).length);
     };
-
     q.on("text-change", onTextChange);
     return () => q.off("text-change", onTextChange);
   }, [quillReady, socketReady]);
 
-  // ── 6. Receive changes from collaborators ────────────────────────────────
+  /* ── 6. Receive changes ────────────────────────────────────── */
   useEffect(() => {
     if (!quillReady || !socketReady) return;
-    const q = quillRef.current;
-    const s = socketRef.current;
-
+    const q = quillRef.current,
+      s = socketRef.current;
     const onReceive = (delta) => q.updateContents(delta);
     s.on("receive-changes", onReceive);
     return () => s.off("receive-changes", onReceive);
   }, [quillReady, socketReady]);
 
+  /* ── 7. Send selection / cursor ────────────────────────────── */
   useEffect(() => {
     if (!socketReady || !quillReady) return;
-    const q = quillRef.current;
-    const s = socketRef.current;
-    const handler = (range, oldRange, source) => {
-      if (source === "user") {
-        s.emit("send-cursor", range);
-      }
+    const q = quillRef.current,
+      s = socketRef.current;
+    const handler = (range, _old, source) => {
+      if (source === "user") s.emit("send-cursor", range);
     };
-
     q.on("selection-change", handler);
-
     return () => q.off("selection-change", handler);
   }, [socketReady, quillReady]);
 
+  /* ── 8. Receive remote cursors ─────────────────────────────── */
   useEffect(() => {
     if (!socketReady || !quillReady) return;
-    const s = socketRef.current;
-    const q = quillRef.current;
-
-    const cursorsModule = q.getModule("cursors");
-
-    const handler = (data) => {
-      const { userId, name, range } = data;
-
-      // 1. If we haven't seen this cursor yet, create it with their matching avatar color
-      if (!cursorsModule.cursors()[userId]) {
-        cursorsModule.createCursor(userId, name, getAvatarColor(name));
+    const s = socketRef.current,
+      q = quillRef.current;
+    const cursors = q.getModule("cursors");
+    const handler = ({ userId, name, range }) => {
+      const color = getCursorColor(name);
+      if (!cursors.cursors()[userId]) {
+        cursors.createCursor(userId, name, color);
       }
-
-      // 2. Move the cursor (or hide it if they clicked completely outside the document)
-      if (range) {
-        cursorsModule.moveCursor(userId, range);
-      } else {
-        cursorsModule.removeCursor(userId);
-      }
+      range ? cursors.moveCursor(userId, range) : cursors.removeCursor(userId);
     };
-
     s.on("receive-cursor", handler);
-
     return () => s.off("receive-cursor", handler);
   }, [socketReady, quillReady]);
 
-  // ── 7. Auto-save loop ────────────────────────────────────────────────────
+  /* ── 9. Auto-save ──────────────────────────────────────────── */
   useEffect(() => {
     if (!quillReady || !socketReady) return;
-    const q = quillRef.current;
-    const s = socketRef.current;
-
+    const q = quillRef.current,
+      s = socketRef.current;
     const interval = setInterval(() => {
-      const contents = q.getContents();
-      s.emit("save-changes", contents);
-      setSaveStatus((prev) => (prev === "saving" ? "saved" : prev));
+      s.emit("save-changes", q.getContents());
+      setSaveStatus((p) => (p === "saving" ? "saved" : p));
     }, SAVE_INTERVAL_MS);
-
     return () => clearInterval(interval);
   }, [quillReady, socketReady]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────
-
+  /* ── Actions ───────────────────────────────────────────────── */
   const handleBack = () => {
-    const q = quillRef.current;
-    const s = socketRef.current;
+    const q = quillRef.current,
+      s = socketRef.current;
     if (q && s) s.emit("save-changes", q.getContents());
     navigate("/dashboard");
   };
 
-  // This is also clear
   const handleTitleChange = (e) => {
     const val = e.target.value;
     setTitle(val);
@@ -291,210 +304,233 @@ const Editor = () => {
     }
   };
 
-  const statusMap = {
-    saved: { label: "Saved", dot: "#a3b18a" },
-    saving: { label: "Saving…", dot: "#f59e0b" },
-    error: { label: "Save failed", dot: "#c41230" },
+  const saveMap = {
+    saved: { label: "Saved", color: "#5BBFB5" },
+    saving: { label: "Saving…", color: "#E8C547" },
+    error: { label: "Save failed", color: T.accent },
   };
-  const st = statusMap[saveStatus] ?? statusMap.saved;
-
-  // Extracts initials (e.g., "John Doe" -> "JD")
-  const getInitials = (name) => {
-    if (!name) return "?";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase();
-  };
-
-  // Generates a consistent background color based on the username string
-  // const getAvatarColor = (name) => {
-  //   let hash = 0;
-  //   for (let i = 0; i < name.length; i++) {
-  //     hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  //   }
-  //   const hue = hash % 360;
-  //   return `hsl(${hue}, 70%, 40%)`; // Dark, readable colors that fit the minimal theme
-  // };
+  const st = saveMap[saveStatus] ?? saveMap.saved;
 
   return (
     <>
+      {/* Google Fonts */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&family=Lora:ital,wght@0,400;0,600;1,400&display=swap"
+        rel="stylesheet"
+      />
+
       <style>{`
-        /* ── Reset & shell ── */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #fdf8f8; font-family: Inter, sans-serif; }
 
         /* ── Quill toolbar ── */
         .ql-toolbar.ql-snow {
           border: none !important;
-          padding: 8px 20px !important;
-          background: transparent;
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 2px;
+          border-bottom: 1px solid ${T.borderDim} !important;
+          padding: 10px 20px !important;
+          background: ${T.bgSurface};
+          display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
         }
         .ql-toolbar.ql-snow .ql-formats { margin-right: 8px; }
-        .ql-toolbar.ql-snow .ql-stroke  { stroke: #8b4a50 !important; transition: stroke .15s; }
-        .ql-toolbar.ql-snow .ql-fill    { fill:  #8b4a50 !important; transition: fill  .15s; }
+        .ql-toolbar.ql-snow .ql-stroke  { stroke: ${T.textDim} !important; transition: stroke .15s; }
+        .ql-toolbar.ql-snow .ql-fill    { fill:  ${T.textDim} !important; transition: fill .15s;   }
         .ql-toolbar.ql-snow button:hover .ql-stroke,
-        .ql-toolbar.ql-snow button.ql-active .ql-stroke { stroke: #c41230 !important; }
+        .ql-toolbar.ql-snow button.ql-active .ql-stroke { stroke: ${T.accent} !important; }
         .ql-toolbar.ql-snow button:hover .ql-fill,
-        .ql-toolbar.ql-snow button.ql-active .ql-fill   { fill:  #c41230 !important; }
-        .ql-toolbar.ql-snow .ql-picker-label { color: #8b4a50 !important; border: none !important; }
-        .ql-toolbar.ql-snow .ql-picker-label:hover { color: #c41230 !important; }
+        .ql-toolbar.ql-snow button.ql-active .ql-fill   { fill:  ${T.accent} !important; }
+        .ql-toolbar.ql-snow .ql-picker-label             { color: ${T.textDim} !important; border: none !important; }
+        .ql-toolbar.ql-snow .ql-picker-label:hover       { color: ${T.accent}  !important; }
+        .ql-toolbar.ql-snow .ql-picker-label .ql-stroke  { stroke: ${T.textDim} !important; }
         .ql-toolbar.ql-snow .ql-picker-options {
-          background: #fff !important;
-          border: 1px solid #f0d0d4 !important;
+          background: ${T.bgSurface} !important;
+          border: 1px solid ${T.borderChip} !important;
           border-radius: 10px !important;
-          box-shadow: 0 8px 24px rgba(107,15,26,.12) !important;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.40) !important;
           padding: 4px !important;
         }
-        .ql-toolbar.ql-snow .ql-picker-item:hover { color: #c41230 !important; }
+        .ql-toolbar.ql-snow .ql-picker-item { color: ${T.textSec} !important; }
+        .ql-toolbar.ql-snow .ql-picker-item:hover { color: ${T.accent} !important; }
+        .ql-toolbar.ql-snow .ql-formats + .ql-formats {
+          border-left: 1px solid ${T.borderDim};
+          padding-left: 8px;
+        }
 
         /* ── Quill container ── */
         .ql-container.ql-snow {
           border: none !important;
-          font-family: "Georgia", "Times New Roman", serif;
-          font-size: 16.5px;
+          font-family: "Lora", Georgia, "Times New Roman", serif;
+          font-size: 17px;
           flex: 1;
+          background: ${T.paper};
         }
 
         /* ── Editor content ── */
         .ql-editor {
-          padding: 56px 72px 80px !important;
-          min-height: 70vh;
-          line-height: 1.9;
-          color: #2a0a0f;
-          caret-color: #c41230;
+          padding: 60px 80px 100px !important;
+          min-height: 72vh;
+          line-height: 1.95;
+          color: #D8D0C8;
+          caret-color: ${T.accent};
         }
         @media (max-width: 640px) {
           .ql-editor { padding: 32px 24px 60px !important; }
         }
         .ql-editor.ql-blank::before {
-          color: #d4a8ae !important;
+          color: ${T.textDim} !important;
           font-style: italic;
-          left: 72px !important;
+          left: 80px !important;
         }
-        .ql-editor ::selection { background: rgba(196,18,48,.10); }
-        .ql-editor h1 { font-size: 2rem;   font-weight: 700; color: #1a0508; margin-bottom: .4em; line-height: 1.25; }
-        .ql-editor h2 { font-size: 1.5rem; font-weight: 600; color: #2a0a0f; margin-bottom: .3em; }
-        .ql-editor h3 { font-size: 1.2rem; font-weight: 600; color: #3d1015; margin-bottom: .25em; }
-        .ql-editor p  { margin-bottom: .55em; }
-        .ql-editor a  { color: #c41230; }
+        .ql-editor ::selection { background: rgba(200,16,46,0.18); }
+
+        .ql-editor h1 { font-family: 'Space Mono', monospace; font-size: 2rem; font-weight: 700; color: ${T.textPrimary}; margin-bottom: .4em; line-height: 1.2; letter-spacing: -0.04em; }
+        .ql-editor h2 { font-family: 'Space Mono', monospace; font-size: 1.45rem; font-weight: 700; color: ${T.textPrimary}; margin-bottom: .3em; letter-spacing: -0.03em; }
+        .ql-editor h3 { font-size: 1.2rem; font-weight: 600; color: #C8C0B8; margin-bottom: .25em; }
+        .ql-editor p  { margin-bottom: .6em; }
+        .ql-editor a  { color: ${T.accent}; }
+
         .ql-editor blockquote {
-          border-left: 3px solid #c41230 !important;
-          background: #fff5f6;
-          padding: 12px 20px !important;
-          margin: 16px 0 !important;
-          border-radius: 0 8px 8px 0;
-          color: #6b0f1a;
+          border-left: 3px solid ${T.accent} !important;
+          background: rgba(200,16,46,0.05);
+          padding: 14px 22px !important;
+          margin: 18px 0 !important;
+          border-radius: 0 10px 10px 0;
+          color: #A89888;
           font-style: italic;
         }
         .ql-editor pre.ql-syntax {
-          background: #1e0a0f !important;
-          color: #f5c0c8 !important;
+          background: #0A0A0A !important;
+          color: #A8D4A0 !important;
+          border: 1px solid ${T.borderDim};
           border-radius: 10px;
-          padding: 16px 20px !important;
-          font-size: 13.5px;
+          padding: 18px 22px !important;
+          font-size: 13px;
+          font-family: 'Space Mono', monospace;
         }
         .ql-editor code {
-          background: #fff0f2;
-          color: #8b1a1a;
+          background: rgba(200,16,46,0.10);
+          color: #E07878;
           border-radius: 4px;
-          padding: 1px 5px;
+          padding: 2px 6px;
           font-size: 14px;
+          font-family: 'Space Mono', monospace;
+        }
+        .ql-editor li { color: #C0B8B0; }
+        .ql-editor .ql-indent-1 { padding-left: 2em; }
+
+        /* ── Remote cursor labels — the fun part ── */
+        .ql-cursor-name {
+          font-family: 'Inter', sans-serif !important;
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          padding: 2px 8px !important;
+          border-radius: 0 6px 6px 6px !important;
+          white-space: nowrap !important;
+          letter-spacing: 0.02em !important;
+          opacity: 1 !important;
+          top: -22px !important;
+        }
+        .ql-cursor-caret {
+          width: 2px !important;
+        }
+        .ql-cursor-flag {
+          bottom: unset !important;
+          top: 0 !important;
         }
 
         /* ── Scrollbar ── */
-        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #f0d0d4; border-radius: 99px; }
-        ::-webkit-scrollbar-thumb:hover { background: #c41230; }
+        ::-webkit-scrollbar-thumb { background: ${T.borderChip}; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: ${T.accent}; }
 
-        /* ── Pulse animation ── */
-        @keyframes kp-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-        .kp-pulse { animation: kp-pulse 1.2s ease-in-out infinite; }
+        /* ── Pulse ── */
+        @keyframes kp-pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+        .kp-pulse { animation: kp-pulse 1.1s ease-in-out infinite; }
+
+        /* ── Cursor avatar pulse on join ── */
+        @keyframes avatar-pop {
+          0%   { transform: scale(0.6); opacity: 0; }
+          70%  { transform: scale(1.15); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .avatar-pop { animation: avatar-pop 0.35s cubic-bezier(.34,1.56,.64,1) forwards; }
 
         /* ── Title input ── */
         .doc-title-input {
-          background: transparent;
-          border: none;
-          outline: none;
+          background: transparent; border: none; outline: none;
           width: 100%;
-          font-family: Inter, sans-serif;
-          font-size: clamp(1.6rem, 3.5vw, 2.4rem);
-          font-weight: 700;
-          color: #1a0508;
-          letter-spacing: -0.03em;
-          line-height: 1.15;
-          caret-color: #c41230;
+          font-family: 'Space Mono', monospace;
+          font-size: clamp(1.5rem, 3vw, 2.2rem);
+          font-weight: 700; color: ${T.textPrimary};
+          letter-spacing: -0.04em; line-height: 1.15;
+          caret-color: ${T.accent};
         }
-        .doc-title-input::placeholder { color: #d4a8ae; }
-
-        /* ── Toolbar divider ── */
-        .ql-formats + .ql-formats { border-left: 1px solid #f0d0d4; padding-left: 8px; }
+        .doc-title-input::placeholder { color: ${T.textDim}; }
       `}</style>
 
       <div
         style={{
           minHeight: "100vh",
-          background: "#fdf8f8",
+          background: T.bgBase,
           display: "flex",
           flexDirection: "column",
+          fontFamily: "'Inter', sans-serif",
         }}
       >
-        {/* ════════════════════════════════════════
-            TOP NAV BAR — minimal: back, logo, status, share
-        ════════════════════════════════════════ */}
+        {/* ══ TOP NAV ═══════════════════════════════════════════ */}
         <header
           style={{
             height: "52px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 24px",
-            background: "rgba(253,248,248,0.94)",
-            backdropFilter: "blur(12px)",
-            borderBottom: "1px solid #f0d0d4",
+            padding: "0 20px",
+            background: "rgba(15,15,15,0.92)",
+            backdropFilter: "blur(14px)",
+            borderBottom: `1px solid ${T.borderDim}`,
             position: "sticky",
             top: 0,
             zIndex: 30,
+            gap: "12px",
           }}
         >
-          {/* Left */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Left — back + breadcrumb */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              minWidth: 0,
+            }}
+          >
             <button
               onClick={handleBack}
-              aria-label="Back to dashboard"
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: "#8b4a50",
-                fontSize: "13px",
+                background: T.bgSurface,
+                border: `1px solid ${T.borderDim}`,
+                borderRadius: "9px",
+                padding: "6px 12px",
+                color: T.textSec,
+                fontSize: "12px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                borderRadius: "8px",
-                transition: "background .15s, color .15s",
+                cursor: "pointer",
+                transition: "border-color 150ms, color 150ms",
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#fff0f2";
-                e.currentTarget.style.color = "#c41230";
+                e.currentTarget.style.borderColor = T.accent;
+                e.currentTarget.style.color = T.textPrimary;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "#8b4a50";
+                e.currentTarget.style.borderColor = T.borderDim;
+                e.currentTarget.style.color = T.textSec;
               }}
             >
               <svg
-                width="14"
-                height="14"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -504,22 +540,39 @@ const Editor = () => {
               >
                 <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "6px",
+                  background: T.accent,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <LogoMark />
+              </div>
               Knotpad
             </button>
 
             <span
-              style={{ color: "#f0d0d4", fontSize: "16px", userSelect: "none" }}
+              style={{
+                color: T.borderChip,
+                fontSize: "14px",
+                userSelect: "none",
+              }}
             >
-              ·
+              ›
             </span>
 
-            {/* Breadcrumb title (short, truncated) */}
             <span
               style={{
-                fontSize: "13px",
-                fontWeight: 500,
-                color: "#c4a0a5",
-                maxWidth: "180px",
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: T.textSec,
+                maxWidth: "160px",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -529,95 +582,161 @@ const Editor = () => {
             </span>
           </div>
 
-          {/* Center — save status */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          {/* Centre — save status */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "7px",
+              flexShrink: 0,
+            }}
+          >
             <span
               className={saveStatus === "saving" ? "kp-pulse" : ""}
               style={{
                 width: "6px",
                 height: "6px",
                 borderRadius: "50%",
-                background: st.dot,
+                background: st.color,
                 display: "inline-block",
+                transition: "background 300ms",
               }}
             />
             <span
-              style={{ fontSize: "12px", color: "#c4a0a5", fontWeight: 500 }}
+              style={{
+                fontSize: "11px",
+                color: T.textDim,
+                fontWeight: 500,
+                letterSpacing: "0.04em",
+              }}
             >
               {st.label}
             </span>
           </div>
 
-          {/* Right */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            {/* Word count chip */}
+          {/* Right — words · avatars · share */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexShrink: 0,
+            }}
+          >
+            {/* Word count */}
             <span
               style={{
                 fontSize: "11px",
-                color: "#c4a0a5",
-                fontWeight: 500,
-                background: "#fff5f6",
-                border: "1px solid #f0d0d4",
+                color: T.textDim,
+                background: T.bgSurface,
+                border: `1px solid ${T.borderDim}`,
                 padding: "4px 10px",
                 borderRadius: "99px",
+                fontFamily: "'Space Mono', monospace",
               }}
             >
-              {wordCount} {wordCount === 1 ? "word" : "words"}
+              {wordCount}
+              {wordCount === 1 || wordCount === 0 ? " word " : " words"}
             </span>
 
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              {activeUsers.map((user) => (
+            {/* ── Active user avatars ── */}
+            {activeUsers.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center" }}>
+                {activeUsers.map((user, i) => {
+                  const color = getCursorColor(user.name);
+                  return (
+                    <div
+                      key={user.socketId}
+                      className="avatar-pop"
+                      title={user.name}
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        background: color,
+                        border: `2px solid ${T.bgBase}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        color: "rgba(0,0,0,0.65)",
+                        fontFamily: "'Space Mono', monospace",
+                        marginLeft: i === 0 ? 0 : "-8px",
+                        zIndex: activeUsers.length - i,
+                        position: "relative",
+                        cursor: "default",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {getInitials(user.name)}
+                    </div>
+                  );
+                })}
+                {/* Live indicator */}
                 <div
-                  key={user.socketId}
-                  title={user.name} // Shows full name on hover
                   style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    backgroundColor: getAvatarColor(user.name),
-                    color: "#fff",
+                    marginLeft: "8px",
                     display: "flex",
-                    justifyContent: "center",
                     alignItems: "center",
-                    fontSize: "0.875rem",
-                    fontWeight: "600",
-                    boxShadow: "0 0 0 2px #fff", // Clean white border separation
+                    gap: "5px",
+                    background: "rgba(91,191,181,0.10)",
+                    border: "1px solid rgba(91,191,181,0.22)",
+                    borderRadius: "99px",
+                    padding: "3px 9px",
                   }}
                 >
-                  {getInitials(user.name)}
+                  <span
+                    className="kp-pulse"
+                    style={{
+                      width: "5px",
+                      height: "5px",
+                      borderRadius: "50%",
+                      background: "#5BBFB5",
+                      display: "inline-block",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      color: "#5BBFB5",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {activeUsers.length} live
+                  </span>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
+            {/* Share button */}
             <button
               onClick={() => setIsModalOpen(true)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                background: "linear-gradient(135deg,#c41230 0%,#6b0f1a 100%)",
+                background: T.accent,
                 color: "#fff",
                 border: "none",
-                cursor: "pointer",
-                fontSize: "13px",
+                borderRadius: "9px",
+                padding: "7px 14px",
+                fontSize: "12px",
                 fontWeight: 600,
-                padding: "7px 16px",
-                borderRadius: "10px",
-                boxShadow: "0 2px 10px rgba(107,15,26,.28)",
-                transition: "box-shadow .15s",
+                cursor: "pointer",
+                transition: "background 150ms",
+                fontFamily: "'Inter', sans-serif",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow =
-                  "0 4px 16px rgba(107,15,26,.42)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow =
-                  "0 2px 10px rgba(107,15,26,.28)";
-              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = T.accentHover)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = T.accent)
+              }
             >
               <svg
-                width="13"
-                height="13"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -633,26 +752,22 @@ const Editor = () => {
               </svg>
               Share
             </button>
-
-            {/* Active collaborators */}
           </div>
         </header>
 
-        {/* ════════════════════════════════════════
-            EDITOR AREA — title + toolbar + paper
-        ════════════════════════════════════════ */}
+        {/* ══ EDITOR AREA ═══════════════════════════════════════ */}
         <main
           style={{
             flex: 1,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            padding: "48px 24px 80px",
+            padding: "44px 24px 80px",
           }}
         >
-          <div style={{ width: "100%", maxWidth: "760px" }}>
-            {/* ── Document title (above the paper) ── */}
-            <div style={{ marginBottom: "28px", paddingLeft: "4px" }}>
+          <div style={{ width: "100%", maxWidth: "780px" }}>
+            {/* Document title */}
+            <div style={{ marginBottom: "24px", paddingLeft: "2px" }}>
               <input
                 className="doc-title-input"
                 type="text"
@@ -661,75 +776,62 @@ const Editor = () => {
                 placeholder="Untitled Document"
                 aria-label="Document title"
               />
-              {/* Thin accent rule below title */}
               <div
+                aria-hidden="true"
                 style={{
-                  marginTop: "12px",
+                  marginTop: "10px",
                   height: "2px",
-                  width: "48px",
-                  background: "linear-gradient(90deg,#c41230,#8b1a1a)",
+                  width: "40px",
+                  background: T.accent,
                   borderRadius: "99px",
                 }}
-                aria-hidden="true"
               />
             </div>
 
-            {/* ── Paper card — toolbar + editor ── */}
+            {/* Paper card */}
             <div
               style={{
-                background: "#ffffff",
-                border: "1px solid #f0d0d4",
+                background: T.paper,
+                border: `1px solid ${T.paperBorder}`,
                 borderRadius: "16px",
-                boxShadow:
-                  "0 8px 40px rgba(107,15,26,.08), 0 1px 4px rgba(107,15,26,.04)",
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
               }}
             >
-              {/* Toolbar strip — themed maroon line on top */}
-              <div
-                style={{
-                  borderBottom: "1px solid #f5e8ea",
-                  background: "#fffafb",
-                  position: "sticky",
-                  top: "52px",
-                  zIndex: 20,
-                }}
-              >
-                {/* Quill injects .ql-toolbar here via wrapperRef */}
-              </div>
-
-              {/* Quill mounts here — toolbar + editor combined */}
+              {/* Quill mounts here — toolbar + editor */}
               <div
                 ref={wrapperRef}
                 style={{ display: "flex", flexDirection: "column", flex: 1 }}
               />
             </div>
 
-            {/* ── Footer meta ── */}
+            {/* Footer meta */}
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
                 justifyContent: "space-between",
-                marginTop: "16px",
-                padding: "0 4px",
+                marginTop: "14px",
+                padding: "0 2px",
               }}
             >
-              <span style={{ fontSize: "11px", color: "#d4b8bc" }}>
-                Knotpad · Auto-saves every {SAVE_INTERVAL_MS / 1000}s
+              <span style={{ fontSize: "10px", color: T.textDim }}>
+                Knotpad · auto-saves every {SAVE_INTERVAL_MS / 1000}s
               </span>
-              <span style={{ fontSize: "11px", color: "#d4b8bc" }}>
+              <span
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "10px",
+                  color: T.textDim,
+                }}
+              >
                 {wordCount} words
               </span>
             </div>
           </div>
         </main>
 
-        {/* ════════════════════════════════════════
-            SHARE MODAL
-        ════════════════════════════════════════ */}
+        {/* ══ SHARE MODAL ═══════════════════════════════════════ */}
         {isModalOpen && (
           <div
             style={{
@@ -739,8 +841,8 @@ const Editor = () => {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: "rgba(42,10,15,.48)",
-              backdropFilter: "blur(5px)",
+              background: "rgba(0,0,0,0.70)",
+              backdropFilter: "blur(6px)",
               padding: "16px",
             }}
             onClick={(e) => {
@@ -751,11 +853,10 @@ const Editor = () => {
               style={{
                 width: "100%",
                 maxWidth: "380px",
-                background: "#ffffff",
-                border: "1.5px solid #f0d0d4",
+                background: T.bgSurface,
+                border: `1px solid ${T.borderChip}`,
                 borderRadius: "20px",
-                padding: "32px",
-                boxShadow: "0 28px 72px rgba(107,15,26,.20)",
+                padding: "28px",
               }}
             >
               {/* Header */}
@@ -764,50 +865,65 @@ const Editor = () => {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "flex-start",
-                  marginBottom: "24px",
+                  marginBottom: "22px",
                 }}
               >
                 <div>
+                  <p
+                    style={{
+                      fontSize: "9px",
+                      fontWeight: 600,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: T.textDim,
+                      marginBottom: "6px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    Collaboration
+                  </p>
                   <h3
                     style={{
+                      fontFamily: "'Space Mono', monospace",
                       fontSize: "16px",
                       fontWeight: 700,
-                      color: "#2a0a0f",
+                      color: T.textPrimary,
+                      letterSpacing: "-0.3px",
                       marginBottom: "4px",
                     }}
                   >
                     Share document
                   </h3>
-                  <p style={{ fontSize: "12px", color: "#c4a0a5" }}>
+                  <p style={{ fontSize: "12px", color: T.textSec }}>
                     Invite a collaborator by email
                   </p>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  aria-label="Close"
                   style={{
                     width: "28px",
                     height: "28px",
                     borderRadius: "8px",
-                    background: "#fff5f6",
-                    border: "none",
+                    background: T.bgRaised,
+                    border: `1px solid ${T.borderDim}`,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "#8b4a50",
-                    transition: "background .15s",
+                    color: T.textSec,
+                    transition: "border-color 150ms",
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#fde8ea";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#fff5f6";
-                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.borderColor = T.accent)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.borderColor = T.borderDim)
+                  }
+                  aria-label="Close"
                 >
                   <svg
-                    width="13"
-                    height="13"
+                    width="11"
+                    height="11"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -819,6 +935,87 @@ const Editor = () => {
                 </button>
               </div>
 
+              {/* Currently online */}
+              {activeUsers.length > 0 && (
+                <div
+                  style={{
+                    background: T.bgRaised,
+                    border: `1px solid ${T.borderDim}`,
+                    borderRadius: "12px",
+                    padding: "12px 14px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "9px",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: T.textDim,
+                      marginBottom: "10px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    Currently editing
+                  </p>
+                  {activeUsers.map((user) => {
+                    const color = getCursorColor(user.name);
+                    return (
+                      <div
+                        key={user.socketId}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "50%",
+                            background: color,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            color: "rgba(0,0,0,0.65)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {getInitials(user.name)}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            flex: 1,
+                          }}
+                        >
+                          <span style={{ fontSize: "12px", color: T.textSec }}>
+                            {user.name}
+                          </span>
+                          <span
+                            className="kp-pulse"
+                            style={{
+                              width: "5px",
+                              height: "5px",
+                              borderRadius: "50%",
+                              background: color,
+                              display: "inline-block",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Feedback */}
               {inviteMsg.text && (
                 <div
@@ -827,46 +1024,20 @@ const Editor = () => {
                     alignItems: "center",
                     gap: "8px",
                     padding: "10px 14px",
-                    borderRadius: "12px",
-                    marginBottom: "16px",
-                    ...(inviteMsg.type === "success"
-                      ? { background: "#f0fdf4", border: "1px solid #bbf7d0" }
-                      : { background: "#fff0f2", border: "1px solid #f5c0c8" }),
+                    borderRadius: "10px",
+                    marginBottom: "14px",
+                    background:
+                      inviteMsg.type === "success"
+                        ? "rgba(91,191,181,0.10)"
+                        : "rgba(200,16,46,0.08)",
+                    border: `1px solid ${inviteMsg.type === "success" ? "rgba(91,191,181,0.25)" : "rgba(200,16,46,0.22)"}`,
                   }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    {inviteMsg.type === "success" ? (
-                      <path
-                        d="M20 6L9 17l-5-5"
-                        stroke="#16a34a"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    ) : (
-                      <>
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="#c41230"
-                          strokeWidth="1.5"
-                        />
-                        <path
-                          d="M12 8v4M12 16h.01"
-                          stroke="#c41230"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
-                      </>
-                    )}
-                  </svg>
                   <p
                     style={{
                       fontSize: "13px",
-                      fontWeight: 500,
                       color:
-                        inviteMsg.type === "success" ? "#16a34a" : "#8b1a1a",
+                        inviteMsg.type === "success" ? "#5BBFB5" : "#E07070",
                     }}
                   >
                     {inviteMsg.text}
@@ -879,10 +1050,12 @@ const Editor = () => {
                 <label
                   style={{
                     display: "block",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#5a1520",
-                    marginBottom: "6px",
+                    fontSize: "10px",
+                    fontWeight: 500,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: T.textDim,
+                    marginBottom: "8px",
                   }}
                 >
                   Email address
@@ -895,23 +1068,24 @@ const Editor = () => {
                   required
                   style={{
                     width: "100%",
-                    padding: "11px 16px",
-                    background: "#fff5f6",
-                    border: "1.5px solid #f0d0d4",
+                    padding: "12px 16px",
+                    background: T.bgInput,
+                    border: `1px solid ${T.borderDim}`,
                     borderRadius: "12px",
                     fontSize: "14px",
-                    color: "#2a0a0f",
+                    color: T.textPrimary,
                     outline: "none",
-                    marginBottom: "20px",
-                    fontFamily: "Inter, sans-serif",
-                    transition: "border .15s, box-shadow .15s",
+                    marginBottom: "16px",
+                    fontFamily: "'Inter', sans-serif",
+                    transition: "border 150ms, box-shadow 150ms",
+                    caretColor: T.accent,
                   }}
                   onFocus={(e) => {
-                    e.target.style.border = "1.5px solid #c41230";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(196,18,48,.10)";
+                    e.target.style.border = `1px solid ${T.accent}`;
+                    e.target.style.boxShadow = `0 0 0 3px ${T.accentGlow}`;
                   }}
                   onBlur={(e) => {
-                    e.target.style.border = "1.5px solid #f0d0d4";
+                    e.target.style.border = `1px solid ${T.borderDim}`;
                     e.target.style.boxShadow = "none";
                   }}
                 />
@@ -921,22 +1095,23 @@ const Editor = () => {
                     onClick={() => setIsModalOpen(false)}
                     style={{
                       flex: 1,
-                      padding: "11px",
+                      padding: "12px",
                       borderRadius: "12px",
-                      background: "#fff5f6",
-                      border: "1px solid #f0d0d4",
-                      color: "#8b4a50",
+                      background: T.bgRaised,
+                      border: `1px solid ${T.borderChip}`,
+                      color: T.textSec,
                       fontSize: "13px",
                       fontWeight: 500,
+                      fontFamily: "'Inter', sans-serif",
                       cursor: "pointer",
-                      transition: "background .15s",
+                      transition: "background 150ms",
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#fde8ea";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "#fff5f6";
-                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = T.borderDim)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = T.bgRaised)
+                    }
                   >
                     Cancel
                   </button>
@@ -944,26 +1119,23 @@ const Editor = () => {
                     type="submit"
                     style={{
                       flex: 1,
-                      padding: "11px",
+                      padding: "12px",
                       borderRadius: "12px",
-                      background:
-                        "linear-gradient(135deg,#c41230 0%,#6b0f1a 100%)",
+                      background: T.accent,
                       border: "none",
                       color: "#fff",
                       fontSize: "13px",
                       fontWeight: 600,
+                      fontFamily: "'Inter', sans-serif",
                       cursor: "pointer",
-                      boxShadow: "0 2px 10px rgba(107,15,26,.28)",
-                      transition: "box-shadow .15s",
+                      transition: "background 150ms",
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow =
-                        "0 4px 16px rgba(107,15,26,.42)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow =
-                        "0 2px 10px rgba(107,15,26,.28)";
-                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = T.accentHover)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = T.accent)
+                    }
                   >
                     Send invite
                   </button>
