@@ -201,8 +201,7 @@ const Dashboard = ({ setAuth }) => {
   const [hoveredListId, setHoveredListId] = useState(null);
   const navigate = useNavigate();
 
-  const random = generateTitle();
-
+  
   const loadDocuments = async () => {
     try {
       const data = await fetchAPI("/documents");
@@ -213,12 +212,13 @@ const Dashboard = ({ setAuth }) => {
         handleLogout();
     }
   };
-
+  
   const handleCreateDocument = async () => {
+    const title = generateTitle();
     try {
       const newDoc = await fetchAPI("/documents", {
         method: "POST",
-        body: JSON.stringify({ title: `${random}` }),
+        body: JSON.stringify({ title: `${title}` }),
       });
       navigate(`/document/${newDoc._id}`);
     } catch (err) {

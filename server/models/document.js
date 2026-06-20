@@ -1,5 +1,5 @@
-import pkg from 'mongoose'
-const { model, Schema } = pkg
+import { model, Schema } from 'mongoose'
+// const { model, Schema } = pkg
 
 const DocumentSchema = new Schema({
     title: {
@@ -15,6 +15,8 @@ const DocumentSchema = new Schema({
         ref: 'User',
         required: true
     },
+
+
     collaborators: [{
         type: Schema.Types.ObjectId,
         ref: 'User',
