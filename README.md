@@ -1,4 +1,5 @@
-# KnotPad 📝
+# KnotPad - Ideas Tied Together
+
 
 A high-performance, real-time collaborative workspace engineered to allow multiple users to edit rich-text documents simultaneously. KnotPad bridges the gap between stateless REST APIs and stateful WebSockets to deliver a seamless, Google Docs-style editing experience.
 
