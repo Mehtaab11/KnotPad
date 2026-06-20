@@ -76,13 +76,24 @@ export const profile = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
     try {
-        const userId = req.user._id || req.user.id;
+        const userId = req.userId;
         const user = await User.findById(userId);
 
         if (!user) return res.status(404).json({ message: 'User not found' });
 
         // Update the name if provided in the request body
-        user.name = req.body.name || user.name;
+        const { name } = req.body;
+        if (name !== undefined) {
+            if (typeof name !== 'string' || name.trim().length === 0) {
+                return res.status(400).json({ message: 'Name must be a non-empty string' });
+            }
+            if (name.length > 100) {
+                return res.status(400).json({ message: 'Name must be 100 characters or less' });
+            }
+        }
+
+        // Update the name if provided in the request body
+        user.name = name || user.name;
 
         const updatedUser = await user.save();
 
