@@ -1,14 +1,207 @@
-// client/src/components/Dashboard.js
+// client/src/components/Dashboard.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { fetchAPI } from "../utils/api";
+import { generateTitle } from "../constants/random";
+
+/* ─── Design Tokens ─────────────────────────────────────────────
+   Behance "Notes potepad and lists" · Knotpad crimson identity
+   Space Mono for display text — the signature
+──────────────────────────────────────────────────────────────── */
+const T = {
+  bgBase: "#0F0F0F",
+  bgSurface: "#171717",
+  bgRaised: "#1E1C1C",
+  bgInput: "#1A1A1A",
+  borderDim: "#252525",
+  borderChip: "#2E2E2E",
+  textPrimary: "#EDEDED",
+  textSec: "#888888",
+  textDim: "#444444",
+  accent: "#C8102E",
+  accentHover: "#E01030",
+  accentGlow: "rgba(200,16,46,0.11)",
+};
+
+/* Folder-style avatar colours — mirrors the Behance coloured circles */
+const AVATAR_COLORS = [
+  "#9B8EC4",
+  "#5BBFB5",
+  "#A8D4A0",
+  "#C4D480",
+  "#E07850",
+  "#7EB8D4",
+  "#D4A07E",
+];
+const docColor = (id) =>
+  AVATAR_COLORS[parseInt(id?.slice(-2) ?? "0", 16) % AVATAR_COLORS.length];
+
+/* Shared SVG icons */
+const IconDoc = ({ size = 14, color = "currentColor" }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+    <path d="M14 2v6h6M16 13H8M16 17H8" />
+  </svg>
+);
+const IconTrash = ({ size = 13 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6M9 6V4h6v2" />
+  </svg>
+);
+const IconArrow = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path
+      d="M9 18l6-6-6-6"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+const IconSpinner = ({ size = 12 }) => (
+  <svg
+    className="animate-spin"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeOpacity="0.3"
+    />
+    <path
+      d="M12 2a10 10 0 0 1 10 10"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+const IconPlus = ({ size = 13 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path
+      d="M12 5v14M5 12h14"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+const IconLogout = () => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+  </svg>
+);
+const IconUser = () => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+/* Logo mark */
+const LogoMark = ({ size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+  >
+    <rect x="4" y="4" width="6" height="6" rx="1.5" fill="white" />
+    <rect
+      x="14"
+      y="4"
+      width="6"
+      height="6"
+      rx="1.5"
+      fill="white"
+      opacity="0.45"
+    />
+    <rect
+      x="4"
+      y="14"
+      width="6"
+      height="6"
+      rx="1.5"
+      fill="white"
+      opacity="0.45"
+    />
+    <rect x="14" y="14" width="6" height="6" rx="1.5" fill="white" />
+  </svg>
+);
 
 const Dashboard = ({ setAuth }) => {
   const [documents, setDocuments] = useState([]);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const [activeNav, setActiveNav] = useState("all");
+  const [hoveredCardId, setHoveredCardId] = useState(null);
+  const [hoveredListId, setHoveredListId] = useState(null);
   const navigate = useNavigate();
+
+  const random = generateTitle();
 
   const loadDocuments = async () => {
     try {
@@ -16,9 +209,8 @@ const Dashboard = ({ setAuth }) => {
       setDocuments(data);
     } catch (err) {
       setError("Failed to load documents.");
-      if (err.message.includes("jwt") || err.message.includes("expired")) {
+      if (err.message.includes("jwt") || err.message.includes("expired"))
         handleLogout();
-      }
     }
   };
 
@@ -26,14 +218,13 @@ const Dashboard = ({ setAuth }) => {
     try {
       const newDoc = await fetchAPI("/documents", {
         method: "POST",
-        body: JSON.stringify({ title: "Untitled Document" }),
+        body: JSON.stringify({ title: `${random}` }),
       });
       navigate(`/document/${newDoc._id}`);
     } catch (err) {
       setError(err.message);
-      if (err.message.includes("jwt") || err.message.includes("expired")) {
+      if (err.message.includes("jwt") || err.message.includes("expired"))
         handleLogout();
-      }
     }
   };
 
@@ -45,7 +236,7 @@ const Dashboard = ({ setAuth }) => {
     try {
       await fetchAPI(`/documents/${docId}`, { method: "DELETE" });
       setDocuments((prev) => prev.filter((d) => d._id !== docId));
-    } catch (err) {
+    } catch {
       setError("Failed to delete document.");
     } finally {
       setDeletingId(null);
@@ -64,749 +255,867 @@ const Dashboard = ({ setAuth }) => {
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
-    const now = new Date();
-    const diffDays = Math.floor((now - date) / 86400000);
+    const diffDays = Math.floor((Date.now() - date) / 86400000);
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
-
-  const navItems = [
-    {
-      id: "all",
-      label: "All Documents",
-      icon: (
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-          <path d="M14 2v6h6" />
-        </svg>
-      ),
-    },
-    {
-      id: "recent",
-      label: "Recent",
-      icon: (
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 6v6l4 2" />
-        </svg>
-      ),
-    },
-    {
-      id: "starred",
-      label: "Starred",
-      icon: (
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      ),
-    },
-  ];
 
   const sortedDocs = [...documents].sort(
     (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
   );
-
-  const recentDocs = sortedDocs.slice(0, 4); // preview strip only
+  const recentDocs = sortedDocs.slice(0, 4);
   const displayDocs =
     activeNav === "recent"
       ? sortedDocs
       : activeNav === "starred"
-        ? documents.filter((d) => d.isStarred) // replace with actual starred field
+        ? documents.filter((d) => d.isStarred)
         : documents;
+
+  const navItems = [
+    { id: "all", label: "All documents", count: documents.length },
+    { id: "recent", label: "Recent", count: null },
+    {
+      id: "starred",
+      label: "Starred",
+      count: documents.filter((d) => d.isStarred).length || null,
+    },
+  ];
 
   return (
     <div
-      className="flex min-h-screen font-sans"
-      style={{ background: "#fdf8f8" }}
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: T.bgBase,
+        fontFamily: "'Inter', sans-serif",
+        color: T.textPrimary,
+      }}
     >
-      {/* ════════════════════════════════
-          SIDEBAR
-      ════════════════════════════════ */}
+      {/* ══ SIDEBAR ══════════════════════════════════════════════ */}
       <aside
-        className="hidden lg:flex flex-col w-60 shrink-0 sticky top-0 h-screen"
-        style={{ background: "#ffffff", borderRight: "1px solid #f0d0d4" }}
+        className="hidden lg:flex"
+        style={{
+          width: "224px",
+          flexShrink: 0,
+          flexDirection: "column",
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          background: T.bgSurface,
+          borderRight: `1px solid ${T.borderDim}`,
+        }}
       >
-        {/* Logo */}
+        {/* Logo row */}
         <div
-          className="flex items-center gap-2.5 px-6 py-5"
-          style={{ borderBottom: "1px solid #f0d0d4" }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            // todo : Discuss uneven fix with sir about what is better 316 & 600
+            padding: "22px 20px 18px",
+            borderBottom: `1px solid ${T.borderDim}`,
+          }}
         >
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: "linear-gradient(135deg, #c41230, #6b0f1a)" }}
+            style={{
+              width: "30px",
+              height: "30px",
+              borderRadius: "9px",
+              background: T.accent,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <rect x="4" y="4" width="6" height="6" rx="1.5" fill="white" />
-              <rect
-                x="14"
-                y="4"
-                width="6"
-                height="6"
-                rx="1.5"
-                fill="white"
-                opacity="0.55"
-              />
-              <rect
-                x="4"
-                y="14"
-                width="6"
-                height="6"
-                rx="1.5"
-                fill="white"
-                opacity="0.55"
-              />
-              <rect x="14" y="14" width="6" height="6" rx="1.5" fill="white" />
-            </svg>
+            <LogoMark size={15} />
           </div>
           <span
-            className="font-bold text-sm tracking-tight"
-            style={{ color: "#2a0a0f" }}
+            style={{
+              fontFamily: "'Space Mono', monospace",
+              fontSize: "13px",
+              fontWeight: 700,
+              color: T.textPrimary,
+              letterSpacing: "-0.3px",
+            }}
           >
             Knotpad
           </span>
         </div>
 
         {/* New doc button */}
-        <div className="px-4 py-4">
+        <div style={{ padding: "16px 14px 12px" }}>
           <button
             onClick={handleCreateDocument}
-            className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-xl text-white transition-all duration-150"
             style={{
-              background: "linear-gradient(135deg, #c41230 0%, #6b0f1a 100%)",
-              boxShadow: "0 2px 10px rgba(107,15,26,0.25)",
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "7px",
+              background: T.accent,
+              color: "#fff",
+              border: "none",
+              borderRadius: "10px",
+              padding: "10px 0",
+              fontSize: "12px",
+              fontWeight: 600,
+              fontFamily: "'Inter', sans-serif",
+              letterSpacing: "0.02em",
+              cursor: "pointer",
+              transition: "background 150ms ease",
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow =
-                "0 4px 16px rgba(107,15,26,0.38)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow =
-                "0 2px 10px rgba(107,15,26,0.25)";
-            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = T.accentHover)
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.background = T.accent)}
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 5v14M5 12h14"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-            New Document
+            <IconPlus /> New document
           </button>
         </div>
 
-        {/* Nav */}
-        <nav className="px-3 flex flex-col gap-0.5">
+        {/* Nav section */}
+        <div style={{ padding: "8px 10px" }}>
           <p
-            className="text-[10px] font-bold tracking-widest uppercase px-3 mb-2 mt-1"
-            style={{ color: "#e8c8cc" }}
+            style={{
+              fontSize: "9px",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: T.textDim,
+              padding: "0 10px",
+              marginBottom: "6px",
+            }}
           >
             Library
           </p>
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveNav(item.id)}
-              className="flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
-              style={
-                activeNav === item.id
-                  ? {
-                      background: "linear-gradient(135deg, #fff0f2, #fde8ea)",
-                      color: "#c41230",
-                      border: "1px solid #f5c0c8",
-                    }
-                  : {
-                      color: "#8b4a50",
-                      background: "transparent",
-                    }
-              }
-              onMouseEnter={(e) => {
-                if (activeNav !== item.id)
-                  e.currentTarget.style.background = "#fff5f6";
-              }}
-              onMouseLeave={(e) => {
-                if (activeNav !== item.id)
-                  e.currentTarget.style.background = "transparent";
-              }}
-            >
-              <span style={{ opacity: activeNav === item.id ? 1 : 0.6 }}>
-                {item.icon}
-              </span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
+          {navItems.map((item) => {
+            const active = activeNav === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveNav(item.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  padding: "9px 10px",
+                  borderRadius: "9px",
+                  border: "none",
+                  background: active ? T.bgRaised : "transparent",
+                  color: active ? T.textPrimary : T.textSec,
+                  fontSize: "13px",
+                  fontWeight: active ? 500 : 400,
+                  fontFamily: "'Inter', sans-serif",
+                  cursor: "pointer",
+                  transition: "background 120ms ease, color 120ms ease",
+                  textAlign: "left",
+                  marginBottom: "2px",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.background = T.bgRaised;
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <span
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  {active && (
+                    <span
+                      style={{
+                        width: "4px",
+                        height: "4px",
+                        borderRadius: "50%",
+                        background: T.accent,
+                        display: "inline-block",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  {item.label}
+                </span>
+                {item.count != null && (
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      color: T.textDim,
+                      fontFamily: "'Space Mono', monospace",
+                    }}
+                  >
+                    {item.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-        {/* Recent in sidebar */}
+        {/* Recent docs in sidebar */}
         {documents.length > 0 && (
-          <div className="px-3 mt-6">
+          <div style={{ padding: "16px 10px 0" }}>
             <p
-              className="text-[10px] font-bold tracking-widest uppercase px-3 mb-2"
-              style={{ color: "#e8c8cc" }}
+              style={{
+                fontSize: "9px",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: T.textDim,
+                padding: "0 10px",
+                marginBottom: "6px",
+              }}
             >
               Recent
             </p>
-            <div className="flex flex-col gap-0.5">
-              {recentDocs.slice(0, 5).map((doc) => (
-                <Link
-                  key={doc._id}
-                  to={`/document/${doc._id}`}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-150 no-underline"
-                  style={{ color: "#8b4a50" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#fff5f6";
+            {recentDocs.slice(0, 5).map((doc) => (
+              <Link
+                key={doc._id}
+                to={`/document/${doc._id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "9px",
+                  padding: "8px 10px",
+                  borderRadius: "9px",
+                  textDecoration: "none",
+                  color: T.textSec,
+                  fontSize: "12px",
+                  transition: "background 120ms ease",
+                  marginBottom: "1px",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = T.bgRaised)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+              >
+                <div
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    background: docColor(doc._id),
+                    flexShrink: 0,
                   }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
+                />
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    flex: 1,
                   }}
                 >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#c4a0a5"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                    <path d="M14 2v6h6" />
-                  </svg>
-                  <span className="truncate text-xs font-medium">
-                    {doc.title}
-                  </span>
-                </Link>
-              ))}
-            </div>
+                  {doc.title}
+                </span>
+              </Link>
+            ))}
           </div>
         )}
 
-        {/* Bottom — sign out */}
+        {/* Bottom actions */}
         <div
-          className="mt-auto px-4 py-4"
-          style={{ borderTop: "1px solid #f0d0d4" }}
+          style={{
+            marginTop: "auto",
+            borderTop: `1px solid ${T.borderDim}`,
+            padding: "12px 10px",
+          }}
         >
           <button
+            onClick={() => navigate("/profile")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "9px",
+              width: "100%",
+              padding: "9px 10px",
+              borderRadius: "9px",
+              border: "none",
+              background: "transparent",
+              color: T.textSec,
+              fontSize: "13px",
+              fontFamily: "'Inter', sans-serif",
+              cursor: "pointer",
+              transition: "background 120ms ease",
+              marginBottom: "2px",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = T.bgRaised)
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "transparent")
+            }
+          >
+            <IconUser /> Profile
+          </button>
+          <button
             onClick={handleLogout}
-            className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
-            style={{ color: "#8b4a50" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "9px",
+              width: "100%",
+              padding: "9px 10px",
+              borderRadius: "9px",
+              border: "none",
+              background: "transparent",
+              color: T.textSec,
+              fontSize: "13px",
+              fontFamily: "'Inter', sans-serif",
+              cursor: "pointer",
+              transition: "background 120ms ease, color 120ms ease",
+            }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#fff5f6";
+              e.currentTarget.style.background = T.bgRaised;
+              e.currentTarget.style.color = T.textPrimary;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = T.textSec;
             }}
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-            </svg>
-            Sign out
+            <IconLogout /> Sign out
           </button>
         </div>
       </aside>
 
-      {/* ════════════════════════════════
-          MAIN CONTENT
-      ════════════════════════════════ */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
+      {/* ══ MAIN ═════════════════════════════════════════════════ */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+        }}
+      >
+        {/* ── TOP BAR ── */}
         <header
-          className="flex items-center justify-between px-8 sticky top-0 z-20"
           style={{
-            height: "60px",
-            background: "rgba(253,248,248,0.90)",
+            // Todo : discuss the fix about todo line 316 & 600
+            height: "71px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 32px",
+            background: "rgba(15,15,15,0.88)",
             backdropFilter: "blur(12px)",
-            borderBottom: "1px solid #f0d0d4",
+            borderBottom: `1px solid ${T.borderDim}`,
+            position: "sticky",
+            top: 0,
+            zIndex: 20,
+            gap: "16px",
           }}
         >
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 lg:hidden">
+          {/* Left — mobile logo OR page title */}
+          <div
+            className="flex lg:hidden"
+            style={{ alignItems: "center", gap: "8px" }}
+          >
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{
-                background: "linear-gradient(135deg, #c41230, #6b0f1a)",
+                width: "26px",
+                height: "26px",
+                borderRadius: "8px",
+                background: T.accent,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <rect x="4" y="4" width="6" height="6" rx="1.5" fill="white" />
-                <rect
-                  x="14"
-                  y="4"
-                  width="6"
-                  height="6"
-                  rx="1.5"
-                  fill="white"
-                  opacity="0.55"
-                />
-                <rect
-                  x="4"
-                  y="14"
-                  width="6"
-                  height="6"
-                  rx="1.5"
-                  fill="white"
-                  opacity="0.55"
-                />
-                <rect
-                  x="14"
-                  y="14"
-                  width="6"
-                  height="6"
-                  rx="1.5"
-                  fill="white"
-                />
-              </svg>
+              <LogoMark size={13} />
             </div>
-            <span className="font-bold text-sm" style={{ color: "#2a0a0f" }}>
+            <span
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: T.textPrimary,
+              }}
+            >
               Knotpad
             </span>
           </div>
 
-          <div className="hidden lg:flex flex-col">
+          <div className="hidden lg:flex" style={{ flexDirection: "column" }}>
             <h1
-              className="font-bold text-base tracking-tight"
-              style={{ color: "#2a0a0f" }}
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "14px",
+                fontWeight: 700,
+                color: T.textPrimary,
+                letterSpacing: "-0.3px",
+                lineHeight: 1.2,
+              }}
             >
-              {activeNav === "all" && "All Documents"}
+              {activeNav === "all" && "All documents"}
               {activeNav === "recent" && "Recent"}
               {activeNav === "starred" && "Starred"}
             </h1>
-            <p className="text-xs" style={{ color: "#c4a0a5" }}>
+            <p style={{ fontSize: "11px", color: T.textDim, marginTop: "1px" }}>
               {documents.length} document{documents.length !== 1 ? "s" : ""}
             </p>
           </div>
 
-          <div className="flex items-center gap-3 ml-auto">
+          {/* Right — profile + new doc */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginLeft: "auto",
+            }}
+          >
+            {/* Mobile new doc */}
             <button
+              className="flex lg:hidden"
               onClick={handleCreateDocument}
-              className="lg:hidden flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white"
               style={{
-                background: "linear-gradient(135deg, #c41230 0%, #6b0f1a 100%)",
+                alignItems: "center",
+                gap: "6px",
+                background: T.accent,
+                color: "#fff",
+                border: "none",
+                borderRadius: "9px",
+                padding: "8px 14px",
+                fontSize: "12px",
+                fontWeight: 600,
+                fontFamily: "'Inter', sans-serif",
+                cursor: "pointer",
+                transition: "background 150ms ease",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = T.accentHover)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = T.accent)
+              }
+            >
+              <IconPlus size={12} /> New
+            </button>
+
+            {/* Profile button — top right, always visible */}
+            <button
+              onClick={() => navigate("/profile")}
+              title="Profile"
+              style={{
+                width: "34px",
+                height: "34px",
+                borderRadius: "50%",
+                border: `1px solid ${T.borderChip}`,
+                background: T.bgSurface,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: T.textSec,
+                transition:
+                  "border-color 150ms ease, color 150ms ease, background 150ms ease",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = T.accent;
+                e.currentTarget.style.color = T.textPrimary;
+                e.currentTarget.style.background = T.bgRaised;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = T.borderChip;
+                e.currentTarget.style.color = T.textSec;
+                e.currentTarget.style.background = T.bgSurface;
               }}
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M12 5v14M5 12h14"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-              New
+              <IconUser />
             </button>
           </div>
         </header>
 
-        {/* Page body */}
-        <main className="flex-1 px-8 py-10 max-w-5xl w-full mx-auto">
+        {/* ── PAGE BODY ── */}
+        <main
+          style={{
+            flex: 1,
+            padding: "36px 32px",
+            maxWidth: "960px",
+            width: "100%",
+            margin: "0 auto",
+          }}
+        >
           {/* Error */}
           {error && (
             <div
-              className="flex items-start gap-2.5 rounded-xl px-4 py-3 mb-8"
-              style={{ background: "#fff0f2", border: "1px solid #f5c0c8" }}
               role="alert"
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "10px",
+                background: "rgba(200,16,46,0.08)",
+                border: "1px solid rgba(200,16,46,0.20)",
+                borderRadius: "12px",
+                padding: "12px 14px",
+                marginBottom: "28px",
+              }}
             >
               <svg
-                width="15"
-                height="15"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
-                className="mt-0.5 shrink-0"
+                style={{ marginTop: "1px", flexShrink: 0 }}
                 aria-hidden="true"
               >
                 <circle
                   cx="12"
                   cy="12"
                   r="10"
-                  stroke="#c41230"
+                  stroke={T.accent}
                   strokeWidth="1.5"
                 />
                 <path
                   d="M12 8v4M12 16h.01"
-                  stroke="#c41230"
+                  stroke={T.accent}
                   strokeWidth="1.5"
                   strokeLinecap="round"
                 />
               </svg>
-              <p className="text-sm" style={{ color: "#8b1a1a" }}>
+              <p
+                style={{ fontSize: "13px", color: "#E07070", lineHeight: 1.5 }}
+              >
                 {error}
               </p>
             </div>
           )}
 
-          {/* ── RECENT STRIP (only on "all" view) ── */}
+          {/* ── RECENT STRIP (all view only) ── */}
           {activeNav === "all" && recentDocs.length > 0 && (
-            <section className="mb-12">
-              <div className="flex items-center justify-between mb-5">
-                <h2
-                  className="font-semibold text-sm"
-                  style={{ color: "#2a0a0f" }}
+            <section style={{ marginBottom: "40px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "16px",
+                  height: "20px",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "9px",
+                    fontWeight: 600,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: T.textDim,
+                    lineHeight: 1,
+                    margin: 0,
+                  }}
                 >
                   Recently edited
-                </h2>
+                </p>
                 <button
                   onClick={() => setActiveNav("recent")}
-                  className="text-xs font-medium transition-colors"
-                  style={{ color: "#c41230" }}
+                  style={{
+                    fontSize: "11px",
+                    color: T.accent,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "'Inter', sans-serif",
+                    transition: "color 150ms ease",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.color = T.accentHover)
+                  }
+                  onMouseLeave={(e) => (e.currentTarget.style.color = T.accent)}
                 >
                   View all →
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+                  gap: "10px",
+                }}
+              >
                 {recentDocs.map((doc) => (
                   <Link
                     key={doc._id}
                     to={`/document/${doc._id}`}
-                    className="group relative flex flex-col justify-between p-5 rounded-2xl no-underline transition-all duration-200"
                     style={{
-                      background: "#ffffff",
-                      border: "1.5px solid #f0d0d4",
-                      minHeight: "130px",
-                      boxShadow: "0 1px 4px rgba(107,15,26,0.05)",
+                      position: "relative",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      padding: "18px",
+                      borderRadius: "14px",
+                      border: `1px solid ${hoveredCardId === doc._id ? T.borderChip : T.borderDim}`,
+                      background:
+                        hoveredCardId === doc._id ? T.bgSurface : T.bgRaised,
+                      minHeight: "128px",
+                      textDecoration: "none",
+                      transition:
+                        "background 150ms ease, border-color 150ms ease, transform 150ms ease",
+                      transform:
+                        hoveredCardId === doc._id
+                          ? "translateY(-2px)"
+                          : "translateY(0)",
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.border = "1.5px solid #c41230";
-                      e.currentTarget.style.boxShadow =
-                        "0 6px 24px rgba(107,15,26,0.10)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.border = "1.5px solid #f0d0d4";
-                      e.currentTarget.style.boxShadow =
-                        "0 1px 4px rgba(107,15,26,0.05)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
+                    onMouseEnter={() => setHoveredCardId(doc._id)}
+                    onMouseLeave={() => setHoveredCardId(null)}
                   >
-                    {/* Delete */}
-                    <button
-                      onClick={(e) => handleDelete(e, doc._id)}
-                      disabled={deletingId === doc._id}
-                      className="absolute top-3 right-3 w-6 h-6 rounded-lg items-center justify-center hidden group-hover:flex transition-all duration-150"
-                      style={{ background: "#fff0f2", color: "#c41230" }}
-                      aria-label="Delete document"
+                    {/* Coloured dot + delete */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: "14px",
+                      }}
                     >
-                      {deletingId === doc._id ? (
-                        <svg
-                          className="animate-spin"
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <circle
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeOpacity="0.3"
-                          />
-                          <path
-                            d="M12 2a10 10 0 0 1 10 10"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                          <path d="M10 11v6M14 11v6" />
-                          <path d="M9 6V4h6v2" />
-                        </svg>
-                      )}
-                    </button>
-
-                    <div>
-                      {/* Doc icon */}
                       <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
                         style={{
-                          background:
-                            "linear-gradient(135deg, #fff0f2, #fde8ea)",
-                          border: "1px solid #f5c0c8",
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "50%",
+                          background: docColor(doc._id),
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#c41230"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                          <path d="M14 2v6h6M16 13H8M16 17H8" />
-                        </svg>
+                        <IconDoc size={13} color="rgba(0,0,0,0.55)" />
                       </div>
+                      {hoveredCardId === doc._id && (
+                        <button
+                          onClick={(e) => handleDelete(e, doc._id)}
+                          disabled={deletingId === doc._id}
+                          style={{
+                            display: "flex",
+                            width: "26px",
+                            height: "26px",
+                            borderRadius: "8px",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "rgba(200,16,46,0.12)",
+                            border: "none",
+                            cursor: "pointer",
+                            color: T.accent,
+                            transition: "background 150ms ease",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background =
+                              "rgba(200,16,46,0.24)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background =
+                              "rgba(200,16,46,0.12)")
+                          }
+                          aria-label="Delete document"
+                        >
+                          {deletingId === doc._id ? (
+                            <IconSpinner size={11} />
+                          ) : (
+                            <IconTrash size={11} />
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    <div>
                       <h3
-                        className="font-semibold text-sm leading-snug line-clamp-2"
-                        style={{ color: "#2a0a0f" }}
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          color: T.textPrimary,
+                          lineHeight: 1.4,
+                          marginBottom: "6px",
+                          overflow: "hidden",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                        }}
                       >
                         {doc.title}
                       </h3>
+                      <p style={{ fontSize: "11px", color: T.textDim }}>
+                        {formatDate(doc.updatedAt)}
+                      </p>
                     </div>
-
-                    <p className="text-xs mt-3" style={{ color: "#c4a0a5" }}>
-                      {formatDate(doc.updatedAt)}
-                    </p>
                   </Link>
                 ))}
               </div>
             </section>
           )}
 
-          {/* ── ALL DOCUMENTS — vertical list ── */}
+          {/* ── DOCUMENT LIST ── */}
           <section>
-            {activeNav === "all" && documents.length > 0 && (
-              <div className="flex items-center justify-between mb-5">
-                <h2
-                  className="font-semibold text-sm"
-                  style={{ color: "#2a0a0f" }}
-                >
-                  All documents
-                </h2>
+            {/* Section header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "14px",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: T.textDim,
+                }}
+              >
+                {activeNav === "all"
+                  ? "All documents"
+                  : activeNav === "recent"
+                    ? "Recent"
+                    : "Starred"}
+              </p>
+              {displayDocs.length > 0 && (
                 <span
-                  className="text-xs font-medium px-2.5 py-1 rounded-full"
                   style={{
-                    background: "#fff0f2",
-                    color: "#c41230",
-                    border: "1px solid #f5c0c8",
+                    fontSize: "10px",
+                    color: T.textDim,
+                    fontFamily: "'Space Mono', monospace",
                   }}
                 >
-                  {documents.length} total
+                  {displayDocs.length}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
 
             {displayDocs.length > 0 ? (
-              <div className="flex flex-col gap-2">
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "4px" }}
+              >
                 {displayDocs.map((doc, index) => (
                   <Link
-                    to={`/document/${doc._id}`}
                     key={doc._id}
-                    className="group flex items-center gap-5 w-full px-6 py-4 rounded-2xl no-underline transition-all duration-200"
+                    to={`/document/${doc._id}`}
                     style={{
-                      background: "#ffffff",
-                      border: "1.5px solid #f0d0d4",
-                      boxShadow: "0 1px 3px rgba(107,15,26,0.04)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "14px",
+                      padding: "14px 18px",
+                      borderRadius: "12px",
+                      border: `1px solid ${hoveredListId === doc._id ? T.borderChip : T.borderDim}`,
+                      background:
+                        hoveredListId === doc._id ? T.bgSurface : T.bgRaised,
+                      textDecoration: "none",
+                      transition:
+                        "background 150ms ease, border-color 150ms ease, transform 150ms ease",
+                      transform:
+                        hoveredListId === doc._id
+                          ? "translateX(3px)"
+                          : "translateX(0)",
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.border = "1.5px solid #c41230";
-                      e.currentTarget.style.boxShadow =
-                        "0 4px 18px rgba(107,15,26,0.09)";
-                      e.currentTarget.style.transform = "translateX(3px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.border = "1.5px solid #f0d0d4";
-                      e.currentTarget.style.boxShadow =
-                        "0 1px 3px rgba(107,15,26,0.04)";
-                      e.currentTarget.style.transform = "translateX(0)";
-                    }}
+                    onMouseEnter={() => setHoveredListId(doc._id)}
+                    onMouseLeave={() => setHoveredListId(null)}
                   >
-                    {/* Icon */}
+                    {/* Coloured circle avatar */}
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                       style={{
-                        background: "linear-gradient(135deg, #fff0f2, #fde8ea)",
-                        border: "1px solid #f5c0c8",
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "50%",
+                        background: docColor(doc._id),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
-                      <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#c41230"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                        <path d="M14 2v6h6M16 13H8M16 17H8" />
-                      </svg>
+                      <IconDoc size={14} color="rgba(0,0,0,0.5)" />
                     </div>
 
                     {/* Title + meta */}
-                    <div className="flex-1 min-w-0">
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <h3
-                        className="font-semibold text-sm truncate mb-0.5"
-                        style={{ color: "#2a0a0f" }}
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          color: T.textPrimary,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          marginBottom: "2px",
+                        }}
                       >
                         {doc.title}
                       </h3>
-                      <p className="text-xs" style={{ color: "#c4a0a5" }}>
+                      <p style={{ fontSize: "11px", color: T.textDim }}>
                         Edited {formatDate(doc.updatedAt)}
                       </p>
                     </div>
 
-                    {/* Index */}
+                    {/* Index number — Space Mono */}
                     <span
-                      className="text-xs font-medium tabular-nums shrink-0"
-                      style={{ color: "#e8c8cc" }}
+                      style={{
+                        fontFamily: "'Space Mono', monospace",
+                        fontSize: "11px",
+                        color: T.textDim,
+                        flexShrink: 0,
+                      }}
                     >
                       {String(index + 1).padStart(2, "0")}
                     </span>
 
-                    {/* Delete */}
-                    <button
-                      onClick={(e) => handleDelete(e, doc._id)}
-                      disabled={deletingId === doc._id}
-                      className="w-8 h-8 rounded-xl items-center justify-center hidden group-hover:flex transition-all duration-150 shrink-0"
-                      style={{
-                        background: "#fff0f2",
-                        color: "#c41230",
-                        border: "1px solid #fdd0d8",
-                      }}
-                      aria-label="Delete document"
-                    >
-                      {deletingId === doc._id ? (
-                        <svg
-                          className="animate-spin"
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <circle
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeOpacity="0.3"
-                          />
-                          <path
-                            d="M12 2a10 10 0 0 1 10 10"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                          <path d="M10 11v6M14 11v6" />
-                          <path d="M9 6V4h6v2" />
-                        </svg>
-                      )}
-                    </button>
+                    {/* Delete — visible only when this row is hovered */}
+                    {hoveredListId === doc._id && (
+                      <button
+                        onClick={(e) => handleDelete(e, doc._id)}
+                        disabled={deletingId === doc._id}
+                        style={{
+                          display: "flex",
+                          width: "30px",
+                          height: "30px",
+                          borderRadius: "8px",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "rgba(200,16,46,0.10)",
+                          border: "none",
+                          cursor: "pointer",
+                          color: T.accent,
+                          flexShrink: 0,
+                          transition: "background 150ms ease",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background =
+                            "rgba(200,16,46,0.22)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background =
+                            "rgba(200,16,46,0.10)")
+                        }
+                        aria-label="Delete document"
+                      >
+                        {deletingId === doc._id ? (
+                          <IconSpinner />
+                        ) : (
+                          <IconTrash />
+                        )}
+                      </button>
+                    )}
 
-                    {/* Arrow */}
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      className="shrink-0 group-hover:opacity-100 transition-opacity duration-150"
-                      style={{ color: "#c41230", opacity: 0.25 }}
-                      aria-hidden="true"
+                    {/* Chevron */}
+                    <span
+                      style={{
+                        color: hoveredListId === doc._id ? T.accent : T.textDim,
+                        flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        transition: "color 150ms ease",
+                      }}
                     >
-                      <path
-                        d="M5 12h14M13 6l6 6-6 6"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                      <IconArrow />
+                    </span>
                   </Link>
                 ))}
               </div>
@@ -814,48 +1123,54 @@ const Dashboard = ({ setAuth }) => {
               /* Empty state */
               !error && (
                 <div
-                  className="flex flex-col items-center justify-center text-center py-24 rounded-2xl"
                   style={{
-                    background: "#ffffff",
-                    border: "1.5px dashed #f0d0d4",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    padding: "80px 24px",
+                    borderRadius: "16px",
+                    border: `1px dashed ${T.borderChip}`,
+                    background: T.bgSurface,
                   }}
                 >
                   <div
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
                     style={{
-                      background: "linear-gradient(135deg, #fff0f2, #fde8ea)",
-                      border: "1px solid #f5c0c8",
+                      width: "52px",
+                      height: "52px",
+                      borderRadius: "14px",
+                      background: T.bgRaised,
+                      border: `1px solid ${T.borderDim}`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: "20px",
                     }}
                   >
-                    <svg
-                      width="28"
-                      height="28"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#c41230"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                      <path d="M14 2v6h6M12 11v6M9 14h6" />
-                    </svg>
+                    <IconDoc size={22} color={T.textDim} />
                   </div>
                   <h3
-                    className="font-semibold mb-2"
-                    style={{ fontSize: "16px", color: "#2a0a0f" }}
+                    style={{
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: T.textPrimary,
+                      marginBottom: "10px",
+                      letterSpacing: "-0.3px",
+                    }}
                   >
                     {activeNav === "starred"
                       ? "No starred documents"
-                      : "No documents yet"}
+                      : "Nothing here yet"}
                   </h3>
                   <p
-                    className="text-sm mb-7"
                     style={{
-                      color: "#c4a0a5",
+                      fontSize: "13px",
+                      color: T.textSec,
                       maxWidth: "220px",
-                      lineHeight: "1.6",
+                      lineHeight: 1.6,
+                      marginBottom: "28px",
                     }}
                   >
                     {activeNav === "starred"
@@ -865,36 +1180,29 @@ const Dashboard = ({ setAuth }) => {
                   {activeNav !== "starred" && (
                     <button
                       onClick={handleCreateDocument}
-                      className="flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-xl text-white transition-all duration-150"
                       style={{
-                        background:
-                          "linear-gradient(135deg, #c41230 0%, #6b0f1a 100%)",
-                        boxShadow: "0 4px 16px rgba(107,15,26,0.28)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: T.accent,
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "11px 22px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        fontFamily: "'Inter', sans-serif",
+                        cursor: "pointer",
+                        transition: "background 150ms ease",
                       }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow =
-                          "0 6px 22px rgba(107,15,26,0.40)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow =
-                          "0 4px 16px rgba(107,15,26,0.28)";
-                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = T.accentHover)
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = T.accent)
+                      }
                     >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M12 5v14M5 12h14"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      Create your first document
+                      <IconPlus /> Create your first document
                     </button>
                   )}
                 </div>
@@ -903,10 +1211,14 @@ const Dashboard = ({ setAuth }) => {
           </section>
         </main>
       </div>
+
+      {/* Google Fonts */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet"
+      />
     </div>
   );
 };
 
 export default Dashboard;
-
-// maximum number of lines are being used by the svgs and animations, so I won't be able to shorten those without losing the icons. The rest of the code is already quite concise and well-structured, following best practices for React components. If you have specific areas you'd like me to focus on for optimization or refactoring, please let me know! ~ Mehtaab

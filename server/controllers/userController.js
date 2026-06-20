@@ -74,3 +74,35 @@ export const profile = async (req, res) => {
     }
 }
 
+export const updateProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await User.findById(userId);
+
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // Update the name if provided in the request body
+        const { name } = req.body;
+        if (name !== undefined) {
+            if (typeof name !== 'string' || name.trim().length === 0) {
+                return res.status(400).json({ message: 'Name must be a non-empty string' });
+            }
+            if (name.length > 100) {
+                return res.status(400).json({ message: 'Name must be 100 characters or less' });
+            }
+        }
+
+        // Update the name if provided in the request body
+        user.name = name || user.name;
+
+        const updatedUser = await user.save();
+
+        res.json({
+            _id: updatedUser._id,
+            name: updatedUser.name,
+            email: updatedUser.email
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating profile' });
+    }
+}

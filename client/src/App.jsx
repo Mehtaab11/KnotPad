@@ -9,6 +9,7 @@ import Login from "./components/Login.jsx";
 import Register from "./components/Register.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import Editor from "./components/Editor.jsx";
+import Profile from "./components/Profile.jsx";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -68,6 +69,17 @@ function App() {
             )
           }
         ></Route>
+
+        <Route
+          path="/profile"
+          element={
+            isAuthenticated ? (
+              <Profile setAuth={setIsAuthenticated} />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
 
         <Route
           path="/document/:id"
