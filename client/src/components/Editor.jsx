@@ -161,7 +161,7 @@ const Editor = () => {
       navigate("/login");
       return;
     }
-    const s = io("http://localhost:5000", { auth: { token } });
+    const s = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", { auth: { token } });
     s.on("connect", () => setSocketReady(true));
     s.on("connect_error", (err) => console.error("socket:", err.message));
     s.on("presence-updates", setActiveUsers);
