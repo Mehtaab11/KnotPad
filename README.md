@@ -33,14 +33,14 @@ To handle real-time user avatars and flying cursors, the backend maintains a lig
 
 ## 🛠️ Tech Stack
 
-**Frontend **
+**Frontend**
 * **React.js** (Vite)
 * **TailwindCSS** (Styling)
 * **Quill.js** (Vanilla JS Rich-Text Engine)
 * **Quill-Cursors** (Coordinate mapping module)
 * **Socket.io-client** (Event listening and broadcasting)
 
-**Backend **
+**Backend**
 * **Node.js & Express.js** (RESTful API)
 * **Socket.io** (WebSocket Server & Room Routing)
 * **MongoDB Atlas & Mongoose** (Database)
