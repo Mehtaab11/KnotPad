@@ -161,7 +161,16 @@ const Editor = () => {
       navigate("/login");
       return;
     }
-    const s = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", { auth: { token } });
+    const getSocketUrl = () => {
+      if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+      if (import.meta.env.VITE_API_URL) {
+        // Strip out /api/v1 (and trailing slashes) from VITE_API_URL to get the root server URL
+        return import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
+      }
+      return "http://localhost:5000";
+    };
+    const socketUrl = getSocketUrl();
+    const s = io(socketUrl, { auth: { token } });
     s.on("connect", () => setSocketReady(true));
     s.on("connect_error", (err) => console.error("socket:", err.message));
     s.on("presence-updates", setActiveUsers);
