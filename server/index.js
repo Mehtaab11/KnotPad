@@ -17,7 +17,10 @@ dotenv.config()
 const app = express()
 
 
-app.use(cors())
+app.use(cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true
+}));
 app.use(express.json())
 
 // Routes
@@ -37,7 +40,7 @@ const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: ['http://localhost:3000', 'http://localhost:5173'], // Added your Vite port!
+        origin: process.env.CLIENT_URL || 'http://localhost:5173',
         methods: ['GET', 'POST'],
     },
 });
@@ -124,7 +127,7 @@ io.on("connection", (socket) => {
                     name: userName,
                     range: range
                 });
-            }); 
+            });
 
             socket.on("save-changes", async (delta) => {
                 await Document.findByIdAndUpdate(documentId, {
