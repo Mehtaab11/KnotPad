@@ -1,5 +1,7 @@
 // Base URL of the backend API
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, "")}/api/v1`
+    : 'http://localhost:5000/api/v1';
 
 // Common function for making API requests
 export const fetchAPI = async (endpoint, options = {}) => {
