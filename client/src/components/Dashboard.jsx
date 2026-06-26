@@ -255,10 +255,11 @@ const Dashboard = ({ setAuth }) => {
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
-    const diffDays = Math.floor((APP_LOAD_TIME - date) / 86400000);
-    if (diffDays === 0) return "Today";
+    const diffMs = APP_LOAD_TIME - date;
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMs < 0 || diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays > 0 && diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
