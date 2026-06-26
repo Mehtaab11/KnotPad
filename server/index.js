@@ -5,8 +5,6 @@ import http from 'http'
 import mongoose from "mongoose"
 import dotenv from "dotenv"
 import jwt from "jsonwebtoken"
-import path from "path"
-import { fileURLToPath } from "url"
 // Routes and Models
 import documentRoutes from "./routes/documentRoutes.js"
 import userRoutes from "./routes/userRoutes.js"
@@ -29,16 +27,10 @@ app.use(express.json())
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/user', userRoutes);
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// Serve static assets in production
-if (process.env.NODE_ENV === "production") {
-    app.use(express.static(path.join(__dirname, "../client/dist")));
-    app.get(/.*/, (req, res) => {
-        res.sendFile(path.resolve(__dirname, "../client", "dist", "index.html"));
-    });
-}
+// Health check route
+app.get("/", (req, res) => {
+    res.json({ status: "ok", message: "Collab Notepad API is running" });
+});
 
 
 // Database Connection
