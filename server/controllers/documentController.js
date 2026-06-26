@@ -70,12 +70,13 @@ export const updateDocument = async (req, res) => {
     try {
         const { title, content } = req.body
 
-        const document = await Document.findByIdAndUpdate({
-            _id: req.params.id,
-            owner: userId
-        }, {
-            title, content
-        },
+        const accessFilter = {
+            $or: [{ owner: userId }, { collaborators: userId }]
+        }
+
+        const document = await Document.findOneAndUpdate(
+            { _id: req.params.id, ...accessFilter },
+            { title, content },
             { new: true } // this line makes sure the updated document is also returned not only updated
         )
 
@@ -95,19 +96,32 @@ export const updateDocument = async (req, res) => {
 
 
 export const deleteDocument = async (req, res) => {
+    const userId = req.userId
+    const docId = req.params.id
 
     try {
 
-        const document = await Document.findByIdAndDelete({ _id: req.params.id, owner: req.userId })
+        const document = await Document.findOne({
+            _id: docId,
+            $or: [{ owner: userId }, { collaborators: userId }]
+        })
 
         if (!document) return res.status(404).json({ message: 'Document Not found' })
 
-        return res.status(200).json({ message: "Document Deleted Successfully" })
+        if (document.owner.toString() === userId) {
+            await Document.findByIdAndDelete(docId)
+            return res.status(200).json({ message: "Document Deleted Successfully" })
+        } else {
+            await Document.findByIdAndUpdate(docId, {
+                $pull: { collaborators: userId }
+            })
+            return res.status(200).json({ message: "Collaborator removed successfully" })
+        }
 
     } catch (error) {
 
         res.status(500).json({
-            message: "Failed to update Document",
+            message: "Failed to delete Document",
             error: error.message
         })
     }
