@@ -162,10 +162,14 @@ const Editor = () => {
       return;
     }
     const getSocketUrl = () => {
-      if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+      if (import.meta.env.VITE_SOCKET_URL)
+        return import.meta.env.VITE_SOCKET_URL;
       if (import.meta.env.VITE_API_URL) {
         // Strip out /api/v1 (and trailing slashes) from VITE_API_URL to get the root server URL
-        return import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
+        return import.meta.env.VITE_API_URL.replace(
+          /\/api\/v1\/?$/,
+          "",
+        ).replace(/\/+$/, "");
       }
       return "http://localhost:5000";
     };
@@ -474,6 +478,47 @@ const Editor = () => {
           caret-color: ${T.accent};
         }
         .doc-title-input::placeholder { color: ${T.textDim}; }
+
+        /* ── Responsive Header ── */
+        @media (max-width: 768px) {
+          .editor-header {
+            padding: 0 12px !important;
+            gap: 8px !important;
+          }
+          .editor-word-count {
+            display: none !important;
+          }
+          .editor-avatars .avatar-pop {
+            display: none !important;
+          }
+          .editor-live-indicator {
+            margin-left: 0 !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .editor-back-text {
+            display: none !important;
+          }
+          .editor-breadcrumb-sep,
+          .editor-breadcrumb-title {
+            display: none !important;
+          }
+          .editor-back-btn {
+            padding: 6px 8px !important;
+            gap: 4px !important;
+          }
+          .editor-status-text {
+            display: none !important;
+          }
+          .editor-share-text {
+            display: none !important;
+          }
+          .editor-share-btn {
+            padding: 7px 10px !important;
+            gap: 0 !important;
+          }
+        }
       `}</style>
 
       <div
@@ -487,6 +532,7 @@ const Editor = () => {
       >
         {/* ══ TOP NAV ═══════════════════════════════════════════ */}
         <header
+          className="editor-header"
           style={{
             height: "52px",
             display: "flex",
@@ -513,6 +559,7 @@ const Editor = () => {
           >
             <button
               onClick={handleBack}
+              className="editor-back-btn"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -562,10 +609,11 @@ const Editor = () => {
               >
                 <LogoMark />
               </div>
-              Knotpad
+              <span className="editor-back-text">Knotpad</span>
             </button>
 
             <span
+              className="editor-breadcrumb-sep"
               style={{
                 color: T.borderChip,
                 fontSize: "14px",
@@ -576,6 +624,7 @@ const Editor = () => {
             </span>
 
             <span
+              className="editor-breadcrumb-title"
               style={{
                 fontFamily: "'Space Mono', monospace",
                 fontSize: "12px",
@@ -593,6 +642,7 @@ const Editor = () => {
 
           {/* Centre — save status */}
           <div
+            className="editor-status"
             style={{
               display: "flex",
               alignItems: "center",
@@ -612,6 +662,7 @@ const Editor = () => {
               }}
             />
             <span
+              className="editor-status-text"
               style={{
                 fontSize: "11px",
                 color: T.textDim,
@@ -625,6 +676,7 @@ const Editor = () => {
 
           {/* Right — words · avatars · share */}
           <div
+            className="editor-header-right"
             style={{
               display: "flex",
               alignItems: "center",
@@ -634,6 +686,7 @@ const Editor = () => {
           >
             {/* Word count */}
             <span
+              className="editor-word-count"
               style={{
                 fontSize: "11px",
                 color: T.textDim,
@@ -650,7 +703,10 @@ const Editor = () => {
 
             {/* ── Active user avatars ── */}
             {activeUsers.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center" }}>
+              <div
+                className="editor-avatars"
+                style={{ display: "flex", alignItems: "center" }}
+              >
                 {activeUsers.map((user, i) => {
                   const color = getCursorColor(user.name);
                   return (
@@ -684,7 +740,9 @@ const Editor = () => {
                 })}
                 {/* Live indicator */}
                 <div
+                  className="editor-live-indicator"
                   style={{
+                    // display: "hidden",
                     marginLeft: "8px",
                     display: "flex",
                     alignItems: "center",
@@ -721,6 +779,7 @@ const Editor = () => {
             {/* Share button */}
             <button
               onClick={() => setIsModalOpen(true)}
+              className="editor-share-btn"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -759,7 +818,7 @@ const Editor = () => {
                 <circle cx="18" cy="19" r="3" />
                 <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" />
               </svg>
-              Share
+              <span className="editor-share-text">Share</span>
             </button>
           </div>
         </header>

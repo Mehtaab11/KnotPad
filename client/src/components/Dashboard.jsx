@@ -1,7 +1,9 @@
 // client/src/components/Dashboard.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { fetchAPI } from "../utils/api";
+
+const APP_LOAD_TIME = Date.now();
 import { generateTitle } from "../constants/random";
 
 /* ─── Design Tokens ─────────────────────────────────────────────
@@ -201,17 +203,11 @@ const Dashboard = ({ setAuth }) => {
   const [hoveredListId, setHoveredListId] = useState(null);
   const navigate = useNavigate();
 
-  
-  const loadDocuments = async () => {
-    try {
-      const data = await fetchAPI("/documents");
-      setDocuments(data);
-    } catch (err) {
-      setError("Failed to load documents.");
-      if (err.message.includes("jwt") || err.message.includes("expired"))
-        handleLogout();
-    }
-  };
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("token");
+    setAuth(false);
+    navigate("/login");
+  }, [navigate, setAuth]);
   
   const handleCreateDocument = async () => {
     const title = generateTitle();
@@ -243,19 +239,23 @@ const Dashboard = ({ setAuth }) => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    setAuth(false);
-    navigate("/login");
-  };
-
   useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const data = await fetchAPI("/documents");
+        setDocuments(data);
+      } catch (err) {
+        setError("Failed to load documents.");
+        if (err.message.includes("jwt") || err.message.includes("expired"))
+          handleLogout();
+      }
+    };
     loadDocuments();
-  }, []);
+  }, [handleLogout]);
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
-    const diffDays = Math.floor((Date.now() - date) / 86400000);
+    const diffDays = Math.floor((APP_LOAD_TIME - date) / 86400000);
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;

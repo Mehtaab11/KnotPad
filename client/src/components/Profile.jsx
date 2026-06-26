@@ -1,5 +1,5 @@
 // client/src/components/Profile.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAPI } from "../utils/api";
 
@@ -121,6 +121,12 @@ const Profile = ({ setAuth }) => {
   const [nameInput, setNameInput] = useState("");
   const navigate = useNavigate();
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("token");
+    setAuth(false);
+    navigate("/login");
+  }, [navigate, setAuth]);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -140,7 +146,7 @@ const Profile = ({ setAuth }) => {
       } catch {/* silent */}
     };
     load();
-  }, []);
+  }, [handleLogout]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -157,12 +163,6 @@ const Profile = ({ setAuth }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    setAuth(false);
-    navigate("/login");
   };
 
   const avatarColor = nameToColor(name);
